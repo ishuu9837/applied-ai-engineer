@@ -1,0 +1,221 @@
+{
+  "agenda": [
+    {
+      "time": "0:00–1:00",
+      "label": "LEARN",
+      "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+    },
+    {
+      "time": "1:00–4:30",
+      "label": "BUILD",
+      "detail": "Write the core logic yourself, using the four-level hint ladder."
+    },
+    {
+      "time": "4:30–5:00",
+      "label": "BREAK IT",
+      "detail": "Deliberately reproduce one failure and document the fix."
+    },
+    {
+      "time": "5:00–5:30",
+      "label": "REVIEW",
+      "detail": "Five-question quiz, cheat sheet, and three interview questions."
+    },
+    {
+      "time": "5:30–6:00",
+      "label": "SHIP",
+      "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+    }
+  ],
+  "day": 2,
+  "title": "SQL + Python essentials",
+  "tagline": "Move data reliably, not impressively.",
+  "outcome": "Correct JOIN, CTE and window queries, vectorized Pandas transformation, and unit-tested Python exceptions.",
+  "tier": {
+    "name": "SQLite + Python + Pandas, local",
+    "status": "Free. No cloud or GPU. SQLite ships with Python; Pandas is open-source. Install using your own virtual environment.",
+    "url": "https://docs.python.org/3/library/sqlite3.html"
+  },
+  "concepts": [
+    {
+      "title": "SQL grain is everything",
+      "body": "Before joining tables, state what one row represents. An accidental one-to-many JOIN can duplicate amounts and silently corrupt revenue totals.",
+      "deep": "Grain means 'what does a row represent?' An invoice table has one row per invoice. A customer table has one row per customer. Joining them creates one row per invoice, not one row per customer. If you sum a customer-level balance after that join, the balance is repeated and your aggregate is wrong.\n\nA correct financial query separates invoice-level and customer-level calculations. Group to the desired grain before joining aggregates. Use `LEFT JOIN` when customers with zero invoices must remain visible, and `COALESCE` only when a missing aggregate truly means zero.",
+      "mentalModel": "Define row grain first, then joins, then aggregation.",
+      "exercise": "If a customer has three invoices, how many rows should the joined table have? Explain what can be summed safely.",
+      "pitfall": "SELECT DISTINCT is not a substitute for correcting a wrong join."
+    },
+    {
+      "title": "CTE versus window function",
+      "body": "CTEs name intermediate queries. A window function computes values across a partition while retaining individual rows. A GROUP BY collapses rows.",
+      "deep": "A CTE (`WITH name AS (...)`) names a subquery so each transformation is readable and testable. A window function computes values across a partition without collapsing rows. For `ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY invoice_date DESC, invoice_id DESC)`, tie-breaking by the invoice ID makes results deterministic.\n\nTo find the latest invoice and the total unpaid overdue amount, compute them in separate CTEs and join those results to customers. When an ordering field is missing or duplicated, choose a documented deterministic tie-breaker. Always check how many rows each join produces.",
+      "mentalModel": "CTE = named step; window = per-group metric without changing the row count.",
+      "exercise": "Explain why GROUP BY alone cannot return an entire latest-invoice record without extra logic.",
+      "pitfall": "Never use ROW_NUMBER with only a tied timestamp if determinism matters."
+    },
+    {
+      "title": "Vectorization and boundaries",
+      "body": "In Pandas, operate on columns where possible; validate input schemas and explicitly handle errors at system boundaries.",
+      "deep": "Pandas vectorization means operating on whole columns using functions such as `to_numeric`, `fillna`, `groupby`, boolean masks and string methods, rather than Python loops over rows. This reduces interpreter overhead and gives clearer operation-level intent. However, vectorization does not fix bad business rules: a blank amount may mean unknown, not zero.\n\nUse dataclasses for small structured internal domain objects and explicit validation to fail early. Separate parsing from business rules. Catch narrow expected exceptions (`TypeError`, `ValueError`), attach actionable error messages, and re-raise when unknown failures must surface.",
+      "mentalModel": "Raw column → typed column → valid mask → grouped summary.",
+      "exercise": "Explain why a missing invoice amount cannot always be replaced with 0.",
+      "pitfall": "Do not silently coerce invalid amounts to a plausible business value."
+    }
+  ],
+  "diagram": [
+    "Raw orders + customers",
+    "JOIN at correct grain",
+    "CTE + ROW_NUMBER",
+    "Validated result"
+  ],
+  "tasks": [
+    {
+      "id": "d2a",
+      "title": "SQL: rank overdue invoices • 80 min",
+      "minutes": 80,
+      "brief": "Create customers and invoices. Find latest invoice per customer using ROW_NUMBER; calculate overdue total only for unpaid invoices; include customers with no invoices. Include duplicates and tied timestamps in your tests.",
+      "deliverable": "queries.sql, expected outputs, and explanation of join cardinality.",
+      "hints": [
+        "Start by describing the grain of each table and the output.",
+        "Use a CTE for ranked invoices; PARTITION BY customer_id, ORDER BY invoice_date DESC, invoice_id DESC.",
+        "Pseudocode: join customer to ranked invoice rows; filter to rank=1 for latest; separately sum unpaid overdue amounts; left join aggregates."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "import sqlite3\ncon = sqlite3.connect(':memory:')\ncon.executescript('''\nCREATE TABLE customers(id TEXT PRIMARY KEY);\nCREATE TABLE invoices(id INTEGER PRIMARY KEY, customer_id TEXT,\n  invoice_date TEXT, amount INTEGER, is_paid INT, overdue INT);\nINSERT INTO customers VALUES ('A'),('B'),('C');\nINSERT INTO invoices VALUES\n (1,'A','2026-01-02',50,0,1), (2,'A','2026-01-03',70,1,0),\n (3,'B','2026-01-03',20,0,1);\n''')\nrows = con.execute('''\nWITH latest AS (\n SELECT customer_id, id,\n ROW_NUMBER() OVER(PARTITION BY customer_id\n  ORDER BY invoice_date DESC, id DESC) AS rn FROM invoices\n), unpaid AS (\n SELECT customer_id, SUM(amount) total FROM invoices\n WHERE is_paid=0 AND overdue=1 GROUP BY customer_id\n)\nSELECT c.id, l.id, COALESCE(u.total,0)\nFROM customers c\nLEFT JOIN latest l ON c.id=l.customer_id AND l.rn=1\nLEFT JOIN unpaid u ON c.id=u.customer_id\nORDER BY c.id\n''').fetchall()\nprint(rows)\n",
+        "run": "python sql_drill.py",
+        "expected": "[('A', 2, 50), ('B', 3, 20), ('C', None, 0)]"
+      },
+      "checks": [
+        "Customer with no invoices",
+        "Tied dates",
+        "Avoid duplicated aggregates"
+      ]
+    },
+    {
+      "id": "d2b",
+      "title": "Pandas: cleaning without apply • 65 min",
+      "minutes": 65,
+      "brief": "Create a deliberately messy CSV with invoice_id, customer_id, amount, invoice_date and paid. Reject negative amounts; calculate totals by customer using column operations. Compare your cleaned count to your own expected count.",
+      "deliverable": "clean.py plus a tiny fixture and 3 tests.",
+      "hints": [
+        "Prefer an explicit cleaning policy over silent dropna calls.",
+        "Try pd.to_numeric(errors=\"coerce\"), boolean masks, and groupby.",
+        "Pseudocode: coerce amount to number; count failed parses; filter amount >= 0; groupby customer and sum; assert totals."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "import pandas as pd\nraw = pd.DataFrame({\n    'invoice_id':[1,2,2,3,4], 'customer_id':['A','A','A','B','B'],\n    'amount':['100','oops','oops','-5','20'],\n    'invoice_date':['2026-01-01']*5, 'paid':[False]*5\n})\nraw['amount'] = pd.to_numeric(raw['amount'], errors='coerce')\nvalid = raw.drop_duplicates('invoice_id').loc[lambda d: d['amount'].notna() & d['amount'].ge(0)]\nprint(valid.groupby('customer_id')['amount'].sum().to_dict())\nprint(f'valid={len(valid)}, rejected={len(raw)-len(valid)}')\n",
+        "run": "python -m pip install pandas && python clean_invoices.py",
+        "expected": "{'A': 100.0, 'B': 20.0}; valid=2, rejected=3"
+      },
+      "checks": [
+        "No Python for-loop across DataFrame rows",
+        "Log rejected records count",
+        "Include null and malformed amounts"
+      ]
+    },
+    {
+      "id": "d2c",
+      "title": "Python: dataclasses and errors • 65 min",
+      "minutes": 65,
+      "brief": "Create an Invoice dataclass and a function that parses a dictionary, raises a helpful ValueError for malformed amount, and never hides all exceptions with except Exception: pass. Test good and bad cases.",
+      "deliverable": "invoice.py, tests and a short decision note.",
+      "hints": [
+        "Use a dataclass for a small, typed record.",
+        "Explicitly distinguish missing fields from invalid formats.",
+        "Pseudocode: read fields; validate required keys; convert amount; reject negative; construct immutable record; raise targeted exceptions."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass Invoice:\n    invoice_id: str\n    amount: float\n\ndef parse_invoice(record: dict) -> Invoice:\n    try:\n        amount = float(record['amount'])\n    except (KeyError, TypeError, ValueError) as err:\n        raise ValueError('amount must be a number') from err\n    if amount < 0:\n        raise ValueError('amount cannot be negative')\n    return Invoice(str(record['invoice_id']), amount)\n\nassert parse_invoice({'invoice_id':1,'amount':'8'}).amount == 8\ntry:\n    parse_invoice({'invoice_id':2,'amount':'oops'})\nexcept ValueError as err:\n    print(str(err))\n",
+        "run": "python invoice_domain.py",
+        "expected": "amount must be a number"
+      },
+      "checks": [
+        "Readable error message",
+        "Unit tests check error types",
+        "No bare except"
+      ]
+    }
+  ],
+  "break": {
+    "title": "The duplicated JOIN",
+    "challenge": "Insert two invoices for the same customer. Join invoices to customer-level totals and sum both totals again. Observe the overcount. Repair the grain or aggregate before joining.",
+    "diagnose": "Write the number of rows before/after the JOIN, then explain the mismatch."
+  },
+  "quiz": [
+    {
+      "question": "ROW_NUMBER with PARTITION BY does what?",
+      "choices": [
+        "Collapses rows",
+        "Ranks rows inside groups",
+        "Creates indexes",
+        "Drops nulls"
+      ],
+      "answer": 1,
+      "explanation": "Window functions retain rows and add group-relative calculations."
+    },
+    {
+      "question": "LEFT JOIN keeps which unmatched rows?",
+      "choices": [
+        "Rows from the left table",
+        "Rows from the right only",
+        "Neither side",
+        "Only duplicates"
+      ],
+      "answer": 0,
+      "explanation": "LEFT JOIN retains every left-side row."
+    },
+    {
+      "question": "Why might SUM be doubled after a JOIN?",
+      "choices": [
+        "Timezone issue",
+        "Wrong row grain causing multiplication",
+        "Rounding only",
+        "Pandas cache"
+      ],
+      "answer": 1,
+      "explanation": "One-to-many joins can multiply measures."
+    },
+    {
+      "question": "Which tends to be better than iterrows for a column calculation?",
+      "choices": [
+        "Vectorized operators",
+        "More nested loops",
+        "Printing each row",
+        "A try/except per row"
+      ],
+      "answer": 0,
+      "explanation": "Vectorization is usually simpler and often faster."
+    },
+    {
+      "question": "A bare except followed by pass is risky because…",
+      "choices": [
+        "It is syntactically invalid",
+        "It silently hides failures",
+        "It prevents typing",
+        "It is always expensive"
+      ],
+      "answer": 1,
+      "explanation": "Hidden failures can corrupt outputs and mask production incidents."
+    }
+  ],
+  "cheatsheet": [
+    "Define grain before any JOIN.",
+    "GROUP BY collapses; window functions annotate.",
+    "ROW_NUMBER requires deterministic ORDER BY for stable results.",
+    "CTEs improve organization, not necessarily performance.",
+    "Vectorize Pandas operations and validate null policy.",
+    "Catch specific exceptions; do not hide failures."
+  ],
+  "interview": [
+    "How would you debug a revenue total that doubled after a JOIN?",
+    "Explain when you would use ROW_NUMBER versus GROUP BY.",
+    "How do you handle malformed records in a production data pipeline?"
+  ],
+  "ship": [
+    "Commit SQL and Python drills with fixtures and tests.",
+    "Record the actual query outputs and failures fixed.",
+    "Draft bullet: Created tested SQL/Pandas transformations with X quality assertions (only once measured)."
+  ]
+}
