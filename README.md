@@ -74,7 +74,7 @@ Lessons are published from **reviewed content**, rather than generated automatic
 - `scripts/release.mjs` handles eligible releases.
 - `.github/workflows/publish.yml` validates the project and schedules publication.
 
-The first prepared batch covers **Days 1–3**, scheduled for **November 6, 2026 (IST)**. The presence of a prepared batch does **not** mean those lessons are already live. Check `content/live/catalog.json` for the actual `releasedDays` list. At the time of this README update, that list is empty.
+The first prepared batch covers **Days 1–3**, scheduled for **November 6, 2026 (IST)**. The presence of a prepared batch does **not** mean those lessons are already live. Check `content/live/catalog.json` for the actual `releasedDays` list. As of November 6, 2026 (IST), **Days 1–3 are published** in `content/live/`.
 
 Additional lessons require prepared, reviewed content before release.
 
