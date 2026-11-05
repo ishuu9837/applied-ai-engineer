@@ -217,5 +217,44 @@
     "Commit FastAPI app, tests and Dockerfile.",
     "Record actual curl samples and container run result.",
     "Draft bullet: Built a containerized FastAPI service with X tested endpoints (replace X after your run)."
+  ],
+  "learningPath": [
+    {
+      "title": "HTTP and API contracts",
+      "explanation": "An endpoint is a public contract: define request JSON, response JSON, validation rules and status codes. Separate client errors (invalid inputs) from server failures. Avoid exposing tracebacks or secrets in error responses.",
+      "example": "Example: POST /predict accepts a documented schema. Invalid data should return a consistent 4xx response; a valid request should return a stable result shape."
+    },
+    {
+      "title": "FastAPI boundaries",
+      "explanation": "Use Pydantic models for input validation and response schemas. Keep route handlers thin: parse and validate at the boundary, call a testable function, then format the response. Dependency injection can isolate services for tests.",
+      "example": "Example flow: HTTP request → Pydantic validation → pure prediction function → response model. Unit-test the function separately from endpoint tests."
+    },
+    {
+      "title": "Containers and reproducibility",
+      "explanation": "A Docker image packages runtime dependencies, not correctness. Pin or constrain dependencies thoughtfully, choose a minimal base image, avoid baking secrets into layers and define the command that starts the server.",
+      "example": "Verify that a fresh image builds, starts, answers a health request and handles malformed input. Document exposed port and configuration."
+    }
+  ],
+  "buildPlan": [
+    {
+      "step": 1,
+      "title": "Define API behavior",
+      "detail": "Write sample request/response bodies and a table of status codes for success, validation failure and internal failure."
+    },
+    {
+      "step": 2,
+      "title": "Implement the service",
+      "detail": "Create a minimal FastAPI application with typed models and a separate core function. Run it locally and inspect generated API documentation."
+    },
+    {
+      "step": 3,
+      "title": "Test the boundary",
+      "detail": "Add endpoint tests for valid input, missing fields, wrong types and invalid ranges. Check both status code and response body."
+    },
+    {
+      "step": 4,
+      "title": "Containerize and verify",
+      "detail": "Write a Dockerfile, build an image, start a container and repeat the tests against the running service. Record exact commands and results."
+    }
   ]
 }
