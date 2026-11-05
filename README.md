@@ -8,19 +8,13 @@ The website opens to an animated, Orbit-inspired landing page. Select **Start le
 
 Progress, XP, notes and self-checks are stored **only in the current browser's localStorage**. Use **Settings → Export JSON backup** to keep a copy. Clearing browser data or changing devices will not automatically transfer progress.
 
-The legacy authentication and private API routes are disabled and return HTTP 404. Cloudflare D1 and R2 are **not required**. Existing D1 records are not deleted by this code change; if no longer needed, remove the database separately in the Cloudflare dashboard after reviewing its contents.
+The old authentication and private API code has been removed. No server-side progress or account storage is provided. Previously provisioned external infrastructure is not deleted by these repository changes.
 
-## Cloudflare deployment
+## Static-site deployment
 
-- Repository: `ishuu9837/applied-ai-engineer`
-- Root directory: `/`
-- Production branch: `main`
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
+Build with `npm run build` and publish the generated `dist/` directory to any static hosting provider. No Cloudflare Worker, Wrangler, D1, R2, or server API is required.
 
-The root `wrangler.jsonc` serves built static assets from `dist/` through the Worker. This repository targets Cloudflare Workers; obsolete Pages Functions and Vercel configuration have been removed. The Worker returns 404 for all `/api/*` routes.
-
-Live URL: https://applied-ai-engineer.eswaryadav8543.workers.dev
+The learning dashboard is available at `/#/home`, and the animated landing page appears at the root URL. Progress remains browser-local.
 
 ## Development
 
