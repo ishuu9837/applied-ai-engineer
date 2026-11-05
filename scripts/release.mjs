@@ -23,14 +23,14 @@ for(let i=0;i<allowed.length;i++){
   const source=path.join(queue,`${publishOn}.json`);
   if(!fs.existsSync(source))throw new Error(`Missing prepared batch: ${source}. No unreviewed content will be generated or published.`);
   const batch=JSON.parse(fs.readFileSync(source,'utf8'));
-  if(batch.schemaVersion!==1||batch.releaseDateIST!==publishOn||!Array.isArray(batch.days)||batch.days.length!==expected.length||batch.days.some((x,j)=>x.day!==expected[j]||!Array.isArray(x.quiz)||x.quiz.length!==5||!Array.isArray(x.tasks)))throw new Error(`Invalid batch ${publishOn}: expected exact prepared batch of validated lesson objects for Days ${expected[0]}–${expected[4]}`);
+  if(batch.schemaVersion!==1||batch.releaseDateIST!==publishOn||!Array.isArray(batch.days)||batch.days.length!==expected.length||batch.days.some((x,j)=>x.day!==expected[j]||!Array.isArray(x.quiz)||x.quiz.length!==5||!Array.isArray(x.tasks)))throw new Error(`Invalid batch ${publishOn}: expected exact prepared batch of validated lesson objects for Days ${expected[0]}–${expected.at(-1)}`);
   for(const lesson of batch.days){
     const filename=`day-${String(lesson.day).padStart(2,'0')}.json`;
     fs.writeFileSync(path.join(live,filename),JSON.stringify(lesson,null,2)+'\n');
     storedDays.add(lesson.day);
   }
   catalog.lastReleaseDate=publishOn;
-  console.log(`Published Days ${expected[0]}–${expected[4]} from prepared material.`);
+  console.log(`Published Days ${expected[0]}–${expected.at(-1)} from prepared material.`);
 }
 catalog.releasedDays=[...storedDays].sort((a,b)=>a-b);
 if(today<=end){

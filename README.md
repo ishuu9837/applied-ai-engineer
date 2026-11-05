@@ -58,7 +58,7 @@ The Worker implementation is at [`worker/index.mjs`](worker/index.mjs). The data
 
 Private API routes require a Cloudflare Access application on the Worker hostname. Authentication is checked with `ctx.access.getIdentity()`, and the account email must match the separate server-side `ALLOWED_EMAIL` secret. D1 is accessed only in the Worker, with parameterized queries; the R2 bucket is private. If Access is not configured or credentials do not match, private requests are rejected.
 
-**To enable syncing**, after validating the API and Access flow, set the `apiBase` HTTPS URL in `public-config.json` and redeploy Pages. In **Settings**, save or restore progress explicitly. The default local mode avoids paid infrastructure and works even when the API is unavailable. Do not hardcode Access tokens, R2 credentials or secrets in frontend files.
+**To enable syncing**, after validating the API and Access flow, set the `apiBase` HTTPS URL in `public-config.json` and redeploy Pages. In **Settings**, save or restore progress explicitly, upload private text/JSON study notes to R2 (1 MiB maximum), and list/download your own artifacts. The default local mode avoids paid infrastructure and works even when the API is unavailable. Do not hardcode Access tokens, R2 credentials or secrets in frontend files.
 
 The Worker has mock tests for Access denial, owner authorization, input size bounds, D1 reads/writes, R2 artifact storage and CORS. These tests do not replace a live Cloudflare integration test.
 

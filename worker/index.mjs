@@ -11,7 +11,7 @@ function json(body,status=200,extra={}) {return new Response(JSON.stringify(body
 function crossOriginHeaders(req,env){
   const origin=req.headers.get('origin');
   if(origin && origin===env.PUBLIC_ORIGIN){
-    return {'access-control-allow-origin':origin,'access-control-allow-credentials':'true', 'access-control-allow-methods':'GET, PUT, POST, OPTIONS','access-control-allow-headers':'Content-Type', 'vary':'Origin'};
+    return {'access-control-allow-origin':origin,'access-control-allow-credentials':'true', 'access-control-allow-methods':'GET, PUT, POST, OPTIONS','access-control-allow-headers':'Content-Type, X-Artifact-Name', 'vary':'Origin'};
   }
   return {'vary':'Origin'};
 }
