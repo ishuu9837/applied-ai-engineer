@@ -57,15 +57,33 @@ async function initAuth(){
  authReady=true;render();
 }
 async function submitAuth(event){
- event.preventDefault();const form=event.target;const mode=form.dataset.mode,data=new FormData(form);
- const email=String(data.get('email')||'').trim().toLowerCase(),password=String(data.get('password')||''),name=String(data.get('name')||'').trim();
- if(mode==='signup'&&!(/.{8,}/s.test(password)&&/[A-Z]/.test(password)&&/[a-z]/.test(password)&&/[0-9]/.test(password)&&/[^A-Za-z0-9\s]/.test(password))){authNotice='Password needs at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character.';render();return;}
+ event.preventDefault();
+ const form=event.target,mode=form.dataset.mode,data=new FormData(form);
+ const email=String(data.get('email')||'').trim().toLowerCase();
+ const password=String(data.get('password')||''),name=String(data.get('name')||'').trim();
+ if(mode==='signup'&&!(password.length>=8&&password.length<=128&&/[A-Z]/.test(password)&&/[a-z]/.test(password)&&/[0-9]/.test(password)&&/[^A-Za-z0-9\\s]/.test(password))){
+  authNotice='Password must be 8–128 characters and include uppercase, lowercase, a number, and a special character.';render();return;
+ }
  if(mode==='signup'&&password!==String(data.get('confirm')||'')){authNotice='Passwords do not match';render();return;}
  const button=form.querySelector('button[type=submit]');if(button)button.disabled=true;
- try{const r=await fetch('/api/auth/'+mode,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,name})});
- const payload=await r.json();if(!r.ok)throw Error(payload.error||'HTTP '+r.status);
- authUser=payload.user;guestMode=false;authNotice='';await restoreUserProgress();navigate('home');render();toast('Signed in successfully.');
- }catch(err){authNotice=err.message;render();}
+ let payload;
+ try{
+  const response=await fetch('/api/auth/'+mode,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,name})});
+  const raw=await response.text();
+  try{payload=JSON.parse(raw);}catch{throw Error('Authentication API returned an invalid response (HTTP '+response.status+').');}
+  if(!response.ok)throw Error(payload.error||'Authentication failed (HTTP '+response.status+').');
+  if(!payload.user?.id)throw Error('Authentication response did not include an account.');
+ }catch(err){
+  console.error('Authentication request failed',err);
+  authNotice='Unable to '+(mode==='signup'?'create account':'sign in')+': '+(err?.message||'Network error');
+  if(button)button.disabled=false;
+  render();return;
+ }
+ // Account creation/login succeeded. A subsequent progress-sync error must not be shown as a signup failure.
+ authUser=payload.user;guestMode=false;authNotice='';
+ try{await restoreUserProgress();}
+ catch(err){console.warn('Signed in, but progress sync is unavailable',err);cloudStatus='Signed in. Cloud progress will be retried later.';}
+ navigate('home');render();toast(mode==='signup'?'Account created successfully.':'Signed in successfully.');
 }
 async function logout(){
  clearTimeout(saveTimer);
