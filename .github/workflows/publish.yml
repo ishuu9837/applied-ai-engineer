@@ -49,5 +49,3 @@ jobs:
             echo "No new reviewed missions were published."
           fi
 
-# Cloudflare Pages Git integration deploys the linked repository's production branch.
-# Verify the bot-originated scheduled release appears in Pages build history.
