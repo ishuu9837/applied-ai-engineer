@@ -1,0 +1,1034 @@
+{
+  "schemaVersion": 1,
+  "batch": 1,
+  "releaseDateIST": "2026-11-06",
+  "days": [
+    {
+      "agenda": [
+        {
+          "time": "0:00–1:00",
+          "label": "LEARN",
+          "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+        },
+        {
+          "time": "1:00–4:30",
+          "label": "BUILD",
+          "detail": "Write the core logic yourself, using the four-level hint ladder."
+        },
+        {
+          "time": "4:30–5:00",
+          "label": "BREAK IT",
+          "detail": "Deliberately reproduce one failure and document the fix."
+        },
+        {
+          "time": "5:00–5:30",
+          "label": "REVIEW",
+          "detail": "Five-question quiz, cheat sheet, and three interview questions."
+        },
+        {
+          "time": "5:30–6:00",
+          "label": "SHIP",
+          "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+        }
+      ],
+      "day": 1,
+      "title": "Diagnostic & project hygiene",
+      "tagline": "Measure the gaps. Then fix only the ones that matter.",
+      "outcome": "A scored baseline diagnostic, a clean local Python project, and a tested first commit.",
+      "tier": {
+        "name": "Local laptop + GitHub + Databricks Free Edition",
+        "status": "Free for this lab. Databricks signup only today; no compute is needed. Public GitHub repos are available on the free plan. Check account-specific eligibility.",
+        "url": "https://docs.databricks.com/aws/en/getting-started/free-edition-limitations"
+      },
+      "concepts": [
+        {
+          "title": "From notebook to product",
+          "body": "Exploratory notebooks are excellent for research. A delivered AI application additionally needs repeatable installs, tests, configuration, safe inputs, and predictable failures."
+        },
+        {
+          "title": "Your two-hour diagnostic",
+          "body": "Set a two-hour timer during BUILD. Work independently: Python (30 min), SQL (30 min), Pandas (30 min), ML reasoning (30 min). Write down where you were slow. Do not ask AI for the answer before attempting."
+        },
+        {
+          "title": "Quality gate",
+          "body": "Typing, linting, tests and environment variables are not ceremony. They let a colleague change your code without guessing what it does, and keep secrets out of Git."
+        }
+      ],
+      "diagram": [
+        "Raw input",
+        "Pure Python function",
+        "Tests + lint",
+        "Git commit"
+      ],
+      "tasks": [
+        {
+          "id": "d1a",
+          "title": "Python diagnostic • 30 min",
+          "minutes": 30,
+          "brief": "Given a list of strings, nulls, and corrupt entries, implement a function returning the sum of valid non-negative integers and the number of invalid values. Decide whether negatives are invalid; document your choice.",
+          "deliverable": "A Python function plus 4 edge-case tests.",
+          "hints": [
+            "Make parsing and validation separate decisions. Ask what each invalid case should do.",
+            "Try iterating once, calling int() only inside try/except, and counting invalid items.",
+            "Pseudocode: initialize total and invalid; for each item: try parse; if not parseable or negative count invalid; else add; return pair."
+          ],
+          "reference": {
+            "language": "python",
+            "code": "def summarize(values):\n    total, bad = 0, 0\n    for value in values:\n        try:\n            number = int(value)\n            if number < 0 or isinstance(value, bool):\n                bad += 1\n                continue\n            total += number\n        except (ValueError, TypeError):\n            bad += 1\n    return total, bad\n\nprint(summarize([\"10\", \"oops\", \"20\", None, \"30\"]))",
+            "expected": "(60, 2)",
+            "run": "python diagnostic.py"
+          },
+          "checks": [
+            "Empty list",
+            "Negative input",
+            "None input",
+            "Malformed string"
+          ]
+        },
+        {
+          "id": "d1b",
+          "title": "SQL diagnostic • 30 min",
+          "minutes": 30,
+          "brief": "Use SQLite or your SQL editor. Create a tiny orders table and answer: revenue by customer, customers with zero orders, and the most recent order per customer. You may use JOINs or a window function.",
+          "deliverable": "Save the SQL file and the output of each query.",
+          "hints": [
+            "There are separate questions about aggregation, missing matches, and latest rows.",
+            "GROUP BY handles revenue; LEFT JOIN exposes missing matches; ROW_NUMBER can rank orders.",
+            "Pseudocode: group orders by customer for revenue; left join customers to orders for zero orders; rank per customer by date then order id."
+          ],
+          "reference": null,
+          "checks": [
+            "Include a customer with zero orders",
+            "Handle tied dates deterministically"
+          ]
+        },
+        {
+          "id": "d1c",
+          "title": "Pandas diagnostic • 30 min",
+          "minutes": 30,
+          "brief": "Create a 10-row table with missing values and duplicates. Clean it without a row-wise Python loop. Compute a grouped summary. Explain what you did with missing data.",
+          "deliverable": "A short notebook or Python file with before/after row counts.",
+          "hints": [
+            "Pandas columns are whole arrays, not just lists of records.",
+            "Look at drop_duplicates, fillna, groupby, and how filtering treats missing values.",
+            "Pseudocode: inspect null counts; remove duplicates by business key; handle missing columns with a stated rule; aggregate by category."
+          ],
+          "reference": null,
+          "checks": [
+            "Explain duplicate key choice",
+            "Report null count before cleaning"
+          ]
+        },
+        {
+          "id": "d1d",
+          "title": "ML reasoning diagnostic • 30 min",
+          "minutes": 30,
+          "brief": "Explain in your own words: leakage, a suitable classification baseline, precision vs recall for missed payment prediction, and why an accuracy-only report can deceive.",
+          "deliverable": "Four short answers, each with a failure example.",
+          "hints": [
+            "Think about what is known at prediction time.",
+            "A feature collected after the label outcome may leak the answer.",
+            "Pseudocode: define timestamp of prediction; list known features; remove future-only features; choose baseline; evaluate beyond one metric."
+          ],
+          "reference": null,
+          "checks": []
+        },
+        {
+          "id": "d1e",
+          "title": "Build the project skeleton • 90 min",
+          "minutes": 90,
+          "brief": "Create .venv, pyproject.toml, src/, tests/, .gitignore and README. Install pytest and ruff. Implement one function from the diagnostic with a test. Run pytest and ruff locally. Use venv + pip today; uv is optional, not required.",
+          "deliverable": "A tested, linted repository with no secrets, datasets, or virtual environment checked in.",
+          "hints": [
+            "Keep production code separate from tests, and never store tokens in Git.",
+            "Use python -m venv .venv, pip install pytest ruff, and run python -m pytest followed by ruff check .",
+            "Pseudocode: create folders; make environment; add dependencies; write function; write test; run checks; commit only source/config/documentation."
+          ],
+          "reference": null,
+          "checks": [
+            "At least 1 passing test",
+            "Ruff reports no errors",
+            "README has reproducible commands",
+            "Databricks signup attempted"
+          ]
+        }
+      ],
+      "break": {
+        "title": "Deliberately commit a secret — safely simulate, never use a real key",
+        "challenge": "Create a dummy string called EXAMPLE_TOKEN and verify whether .gitignore excludes .env but NOT committed Python source. Remove the dummy string and write a rule: secrets belong in environment variables and a secret manager, never in source.",
+        "diagnose": "git status and git diff --cached reveal exactly what would be committed; .gitignore does not erase tracked files."
+      },
+      "quiz": [
+        {
+          "question": "Which file normally should NOT go to a public repository?",
+          "choices": [
+            "README.md",
+            ".env with real API key",
+            "pyproject.toml",
+            "tests/test_app.py"
+          ],
+          "answer": 1,
+          "explanation": ".env commonly contains secrets. Commit an .env.example with placeholder names instead."
+        },
+        {
+          "question": "What does pytest primarily provide?",
+          "choices": [
+            "Model training",
+            "Automated checks of expected behavior",
+            "Version control",
+            "Cloud compute"
+          ],
+          "answer": 1,
+          "explanation": "pytest runs repeatable tests; it does not train models."
+        },
+        {
+          "question": "A feature measured after the target event is often…",
+          "choices": [
+            "A useful baseline",
+            "Data leakage",
+            "Required for calibration",
+            "A primary key"
+          ],
+          "answer": 1,
+          "explanation": "Post-outcome features can make test metrics falsely optimistic."
+        },
+        {
+          "question": "Why use a virtual environment?",
+          "choices": [
+            "Guarantee faster Python",
+            "Keep dependencies isolated",
+            "Encrypt project data",
+            "Replace Docker"
+          ],
+          "answer": 1,
+          "explanation": "Separate environments help reproduce installs and avoid conflicts."
+        },
+        {
+          "question": "What does ruff check do?",
+          "choices": [
+            "Static linting",
+            "Start a web server",
+            "Execute SQL",
+            "Deploy an API"
+          ],
+          "answer": 0,
+          "explanation": "Ruff is a fast Python linter and formatter; linting is not a substitute for tests."
+        }
+      ],
+      "cheatsheet": [
+        "Pure function = same input, same result, no outside side effects.",
+        "Use type hints for contracts; validate untrusted inputs at runtime.",
+        "Never commit .env, credentials, private data, or large model weights.",
+        "Leakage: data from the future or data derived from the label.",
+        "pytest validates behavior; ruff catches many static quality issues.",
+        "A reproducible README has install, run, test, assumptions and limitations."
+      ],
+      "interview": [
+        "Tell me about your last ML project. How would you make it reproducible for another engineer?",
+        "How do you catch leakage before training rather than after a suspiciously high score?",
+        "What do you unit-test in an ML data-cleaning function, and what requires integration tests?"
+      ],
+      "ship": [
+        "Git commit: day01: diagnostic and project scaffold",
+        "README: show commands, test result and actual gaps",
+        "Draft bullet: Built a reproducible Python project with X passing tests and lint checks (replace X after running)."
+      ]
+    },
+    {
+      "agenda": [
+        {
+          "time": "0:00–1:00",
+          "label": "LEARN",
+          "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+        },
+        {
+          "time": "1:00–4:30",
+          "label": "BUILD",
+          "detail": "Write the core logic yourself, using the four-level hint ladder."
+        },
+        {
+          "time": "4:30–5:00",
+          "label": "BREAK IT",
+          "detail": "Deliberately reproduce one failure and document the fix."
+        },
+        {
+          "time": "5:00–5:30",
+          "label": "REVIEW",
+          "detail": "Five-question quiz, cheat sheet, and three interview questions."
+        },
+        {
+          "time": "5:30–6:00",
+          "label": "SHIP",
+          "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+        }
+      ],
+      "day": 2,
+      "title": "SQL + Python essentials",
+      "tagline": "Move data reliably, not impressively.",
+      "outcome": "Correct JOIN, CTE and window queries, vectorized Pandas transformation, and unit-tested Python exceptions.",
+      "tier": {
+        "name": "SQLite + Python + Pandas, local",
+        "status": "Free. No cloud or GPU. SQLite ships with Python; Pandas is open-source. Install using your own virtual environment.",
+        "url": "https://docs.python.org/3/library/sqlite3.html"
+      },
+      "concepts": [
+        {
+          "title": "SQL grain is everything",
+          "body": "Before joining tables, state what one row represents. An accidental one-to-many JOIN can duplicate amounts and silently corrupt revenue totals."
+        },
+        {
+          "title": "CTE versus window function",
+          "body": "CTEs name intermediate queries. A window function computes values across a partition while retaining individual rows. A GROUP BY collapses rows."
+        },
+        {
+          "title": "Vectorization and boundaries",
+          "body": "In Pandas, operate on columns where possible; validate input schemas and explicitly handle errors at system boundaries."
+        }
+      ],
+      "diagram": [
+        "Raw orders + customers",
+        "JOIN at correct grain",
+        "CTE + ROW_NUMBER",
+        "Validated result"
+      ],
+      "tasks": [
+        {
+          "id": "d2a",
+          "title": "SQL: rank overdue invoices • 80 min",
+          "minutes": 80,
+          "brief": "Create customers and invoices. Find latest invoice per customer using ROW_NUMBER; calculate overdue total only for unpaid invoices; include customers with no invoices. Include duplicates and tied timestamps in your tests.",
+          "deliverable": "queries.sql, expected outputs, and explanation of join cardinality.",
+          "hints": [
+            "Start by describing the grain of each table and the output.",
+            "Use a CTE for ranked invoices; PARTITION BY customer_id, ORDER BY invoice_date DESC, invoice_id DESC.",
+            "Pseudocode: join customer to ranked invoice rows; filter to rank=1 for latest; separately sum unpaid overdue amounts; left join aggregates."
+          ],
+          "reference": {
+            "language": "python",
+            "code": "import sqlite3\ncon = sqlite3.connect(\":memory:\")\ncon.executescript(\"\"\"\nCREATE TABLE invoices(customer TEXT, invoice_id INT, amount INT);\nINSERT INTO invoices VALUES ('A', 1, 50), ('A', 2, 70), ('B', 3, 20);\n\"\"\")\nrows = con.execute(\"\"\"\nWITH ranked AS (\n SELECT customer, invoice_id, amount,\n ROW_NUMBER() OVER (PARTITION BY customer ORDER BY invoice_id DESC) AS rn\n FROM invoices\n) SELECT customer, amount FROM ranked WHERE rn=1 ORDER BY customer\n\"\"\").fetchall()\nprint(rows)",
+            "expected": "[('A', 70), ('B', 20)]",
+            "run": "python sql_drill.py"
+          },
+          "checks": [
+            "Customer with no invoices",
+            "Tied dates",
+            "Avoid duplicated aggregates"
+          ]
+        },
+        {
+          "id": "d2b",
+          "title": "Pandas: cleaning without apply • 65 min",
+          "minutes": 65,
+          "brief": "Create a deliberately messy CSV with invoice_id, customer_id, amount, invoice_date and paid. Reject negative amounts; calculate totals by customer using column operations. Compare your cleaned count to your own expected count.",
+          "deliverable": "clean.py plus a tiny fixture and 3 tests.",
+          "hints": [
+            "Prefer an explicit cleaning policy over silent dropna calls.",
+            "Try pd.to_numeric(errors=\"coerce\"), boolean masks, and groupby.",
+            "Pseudocode: coerce amount to number; count failed parses; filter amount >= 0; groupby customer and sum; assert totals."
+          ],
+          "reference": null,
+          "checks": [
+            "No Python for-loop across DataFrame rows",
+            "Log rejected records count",
+            "Include null and malformed amounts"
+          ]
+        },
+        {
+          "id": "d2c",
+          "title": "Python: dataclasses and errors • 65 min",
+          "minutes": 65,
+          "brief": "Create an Invoice dataclass and a function that parses a dictionary, raises a helpful ValueError for malformed amount, and never hides all exceptions with except Exception: pass. Test good and bad cases.",
+          "deliverable": "invoice.py, tests and a short decision note.",
+          "hints": [
+            "Use a dataclass for a small, typed record.",
+            "Explicitly distinguish missing fields from invalid formats.",
+            "Pseudocode: read fields; validate required keys; convert amount; reject negative; construct immutable record; raise targeted exceptions."
+          ],
+          "reference": null,
+          "checks": [
+            "Readable error message",
+            "Unit tests check error types",
+            "No bare except"
+          ]
+        }
+      ],
+      "break": {
+        "title": "The duplicated JOIN",
+        "challenge": "Insert two invoices for the same customer. Join invoices to customer-level totals and sum both totals again. Observe the overcount. Repair the grain or aggregate before joining.",
+        "diagnose": "Write the number of rows before/after the JOIN, then explain the mismatch."
+      },
+      "quiz": [
+        {
+          "question": "ROW_NUMBER with PARTITION BY does what?",
+          "choices": [
+            "Collapses rows",
+            "Ranks rows inside groups",
+            "Creates indexes",
+            "Drops nulls"
+          ],
+          "answer": 1,
+          "explanation": "Window functions retain rows and add group-relative calculations."
+        },
+        {
+          "question": "LEFT JOIN keeps which unmatched rows?",
+          "choices": [
+            "Rows from the left table",
+            "Rows from the right only",
+            "Neither side",
+            "Only duplicates"
+          ],
+          "answer": 0,
+          "explanation": "LEFT JOIN retains every left-side row."
+        },
+        {
+          "question": "Why might SUM be doubled after a JOIN?",
+          "choices": [
+            "Timezone issue",
+            "Wrong row grain causing multiplication",
+            "Rounding only",
+            "Pandas cache"
+          ],
+          "answer": 1,
+          "explanation": "One-to-many joins can multiply measures."
+        },
+        {
+          "question": "Which tends to be better than iterrows for a column calculation?",
+          "choices": [
+            "Vectorized operators",
+            "More nested loops",
+            "Printing each row",
+            "A try/except per row"
+          ],
+          "answer": 0,
+          "explanation": "Vectorization is usually simpler and often faster."
+        },
+        {
+          "question": "A bare except followed by pass is risky because…",
+          "choices": [
+            "It is syntactically invalid",
+            "It silently hides failures",
+            "It prevents typing",
+            "It is always expensive"
+          ],
+          "answer": 1,
+          "explanation": "Hidden failures can corrupt outputs and mask production incidents."
+        }
+      ],
+      "cheatsheet": [
+        "Define grain before any JOIN.",
+        "GROUP BY collapses; window functions annotate.",
+        "ROW_NUMBER requires deterministic ORDER BY for stable results.",
+        "CTEs improve organization, not necessarily performance.",
+        "Vectorize Pandas operations and validate null policy.",
+        "Catch specific exceptions; do not hide failures."
+      ],
+      "interview": [
+        "How would you debug a revenue total that doubled after a JOIN?",
+        "Explain when you would use ROW_NUMBER versus GROUP BY.",
+        "How do you handle malformed records in a production data pipeline?"
+      ],
+      "ship": [
+        "Commit SQL and Python drills with fixtures and tests.",
+        "Record the actual query outputs and failures fixed.",
+        "Draft bullet: Created tested SQL/Pandas transformations with X quality assertions (only once measured)."
+      ]
+    },
+    {
+      "agenda": [
+        {
+          "time": "0:00–1:00",
+          "label": "LEARN",
+          "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+        },
+        {
+          "time": "1:00–4:30",
+          "label": "BUILD",
+          "detail": "Write the core logic yourself, using the four-level hint ladder."
+        },
+        {
+          "time": "4:30–5:00",
+          "label": "BREAK IT",
+          "detail": "Deliberately reproduce one failure and document the fix."
+        },
+        {
+          "time": "5:00–5:30",
+          "label": "REVIEW",
+          "detail": "Five-question quiz, cheat sheet, and three interview questions."
+        },
+        {
+          "time": "5:30–6:00",
+          "label": "SHIP",
+          "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+        }
+      ],
+      "day": 3,
+      "title": "FastAPI + Docker",
+      "tagline": "Your first tiny service with an honest contract.",
+      "outcome": "A working prediction-like API stub with request validation, health endpoint, tests, and a local container.",
+      "tier": {
+        "name": "FastAPI, Pydantic, Docker or Podman",
+        "status": "Free when running locally. Docker Desktop licensing depends on organization size/use; use free Podman if not eligible. Verify currently installed package versions before the lab; avoid unpinned production versions.",
+        "url": "https://docs.docker.com/subscription/desktop-license/"
+      },
+      "concepts": [
+        {
+          "title": "HTTP contracts",
+          "body": "A request has method, path, headers and body. Your API should validate untrusted input, return understandable errors, and respond predictably."
+        },
+        {
+          "title": "Pydantic + FastAPI",
+          "body": "Pydantic validates typed request models at runtime. FastAPI uses these types to generate OpenAPI documentation. Validation is not authentication."
+        },
+        {
+          "title": "Container boundaries",
+          "body": "Docker packages your application and dependencies. It does not automatically secure your API or guarantee observability."
+        }
+      ],
+      "diagram": [
+        "JSON request",
+        "Pydantic validation",
+        "Pure scoring function",
+        "JSON response"
+      ],
+      "tasks": [
+        {
+          "id": "d3a",
+          "title": "Create /health and /score endpoints • 90 min",
+          "minutes": 90,
+          "brief": "Make /health return a stable status. Define a strict request schema for an invoice with amount and days_overdue. Implement your OWN scoring rule as a temporary deterministic stub, labeled a rule, not an ML model.",
+          "deliverable": "main.py, sample request/response, and API contract in README.",
+          "hints": [
+            "Start with a pure function separate from the web endpoint.",
+            "Use a Pydantic BaseModel with Field constraints; then call your function from a POST route.",
+            "Pseudocode: parse request model; reject negative amount; compute a simple rule; serialize score and rule version."
+          ],
+          "reference": {
+            "language": "python",
+            "code": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\nclass Invoice(BaseModel):\n    amount: float = Field(ge=0)\n    days_overdue: int = Field(ge=0)\n\n@app.get(\"/health\")\ndef health():\n    return {\"status\": \"ok\"}\n\n@app.post(\"/score\")\ndef score(invoice: Invoice):\n    return {\"risk_flag\": invoice.days_overdue >= 30, \"kind\": \"rule_only\"}",
+            "expected": "After `uvicorn main:app --reload`, GET /health returns {\"status\":\"ok\"}; POST /score with {\"amount\":200,\"days_overdue\":45} returns {\"risk_flag\":true,\"kind\":\"rule_only\"}.",
+            "run": "pip install fastapi uvicorn && uvicorn main:app --reload"
+          },
+          "checks": [
+            "Reject negative values",
+            "Separate pure function from HTTP",
+            "Do not call stub an ML model"
+          ]
+        },
+        {
+          "id": "d3b",
+          "title": "Write endpoint tests • 60 min",
+          "minutes": 60,
+          "brief": "Test GET /health, valid POST, and invalid POST with negative amount. Verify the error is a 4xx, not a 500.",
+          "deliverable": "test_main.py and real pytest output.",
+          "hints": [
+            "HTTP testing checks both status codes and response bodies.",
+            "Use fastapi.testclient.TestClient; httpx is required by TestClient and must be installed.",
+            "Pseudocode: create client; call routes; assert expected status and response; send invalid input and assert validation error."
+          ],
+          "reference": null,
+          "checks": [
+            "2xx for valid input",
+            "4xx for invalid data",
+            "Health check independent of scoring"
+          ]
+        },
+        {
+          "id": "d3c",
+          "title": "Containerize and smoke-test • 60 min",
+          "minutes": 60,
+          "brief": "Create a small Python Dockerfile, install pinned requirements after checking versions, expose port 8000, and test the app from your laptop. Do not copy .env into the image.",
+          "deliverable": "Dockerfile, .dockerignore, exact working build/run commands.",
+          "hints": [
+            "A container needs a working directory, dependencies, source and a foreground process.",
+            "Use python:3.12-slim, WORKDIR, COPY requirements, pip install, COPY app, and CMD uvicorn.",
+            "Pseudocode: build image; run with port mapping; GET /health; inspect logs; stop container."
+          ],
+          "reference": null,
+          "checks": [
+            "Avoid baking API keys",
+            "Use .dockerignore",
+            "Health check succeeds"
+          ]
+        }
+      ],
+      "break": {
+        "title": "Invalid request path",
+        "challenge": "Send {\"amount\":-10,\"days_overdue\":45} to /score. Observe the validation response. Then send a string where a number is expected and explain coercion/strict-mode tradeoffs.",
+        "diagnose": "Distinguish 422 validation errors from 500 programming errors; capture the real HTTP status."
+      },
+      "quiz": [
+        {
+          "question": "Which HTTP method is most natural for scoring a JSON body?",
+          "choices": [
+            "GET",
+            "POST",
+            "DELETE",
+            "HEAD"
+          ],
+          "answer": 1,
+          "explanation": "POST accepts a request body with explicit input data."
+        },
+        {
+          "question": "Does Pydantic replace authorization?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only with Docker",
+            "Only on cloud"
+          ],
+          "answer": 1,
+          "explanation": "Input validation and access control address different risks."
+        },
+        {
+          "question": "An invalid input should usually result in…",
+          "choices": [
+            "5xx always",
+            "A clear client error response",
+            "Process crash",
+            "Silent default"
+          ],
+          "answer": 1,
+          "explanation": "Return a meaningful 4xx code when the client sends invalid data."
+        },
+        {
+          "question": "Does a Dockerfile keep secrets out automatically?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only on Linux",
+            "Only if public"
+          ],
+          "answer": 1,
+          "explanation": "Avoid copying .env and supply secrets at runtime."
+        },
+        {
+          "question": "What is a health check for?",
+          "choices": [
+            "Proving ML accuracy",
+            "Signaling basic service availability",
+            "Encrypting requests",
+            "Installing packages"
+          ],
+          "answer": 1,
+          "explanation": "Health endpoints indicate if a service is alive; they do not prove predictions are correct."
+        }
+      ],
+      "cheatsheet": [
+        "GET reads; POST submits data.",
+        "422 often indicates FastAPI/Pydantic validation errors.",
+        "Request schema is a contract; reject unsafe inputs.",
+        "Business logic belongs outside route handlers.",
+        "Container ≠ secure deployment; manage secrets and dependencies.",
+        "Test valid, invalid, and boundary requests."
+      ],
+      "interview": [
+        "What would you change before exposing this API to a customer?",
+        "Why test the pure scoring function separately from the FastAPI endpoint?",
+        "How do you avoid leaking credentials in a Docker image?"
+      ],
+      "ship": [
+        "Commit FastAPI app, tests and Dockerfile.",
+        "Record actual curl samples and container run result.",
+        "Draft bullet: Built a containerized FastAPI service with X tested endpoints (replace X after your run)."
+      ]
+    },
+    {
+      "agenda": [
+        {
+          "time": "0:00–1:00",
+          "label": "LEARN",
+          "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+        },
+        {
+          "time": "1:00–4:30",
+          "label": "BUILD",
+          "detail": "Write the core logic yourself, using the four-level hint ladder."
+        },
+        {
+          "time": "4:30–5:00",
+          "label": "BREAK IT",
+          "detail": "Deliberately reproduce one failure and document the fix."
+        },
+        {
+          "time": "5:00–5:30",
+          "label": "REVIEW",
+          "detail": "Five-question quiz, cheat sheet, and three interview questions."
+        },
+        {
+          "time": "5:30–6:00",
+          "label": "SHIP",
+          "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+        }
+      ],
+      "day": 4,
+      "title": "Databricks & Spark",
+      "tagline": "Think in distributed dataframes, even with tiny data.",
+      "outcome": "A working PySpark data transformation, an explained execution plan, and an agreed Project 1 business problem.",
+      "tier": {
+        "name": "Databricks Free Edition serverless compute",
+        "status": "Free Edition has fair-use quotas, only serverless compute, and no reliability SLA. Workspace quotas vary; do not assume unlimited hours. Local PySpark is a free fallback. No GPU is needed.",
+        "url": "https://docs.databricks.com/aws/en/getting-started/free-edition-limitations"
+      },
+      "concepts": [
+        {
+          "title": "Why Spark exists",
+          "body": "Spark distributes operations over partitions. Your code describes a transformation graph; Spark can wait until an action like count() triggers work."
+        },
+        {
+          "title": "Transformations vs actions",
+          "body": "select, filter, join and groupBy describe changes. count, collect and show cause computation. Avoid collect on large datasets."
+        },
+        {
+          "title": "Free Edition reality",
+          "body": "Use a small dataset. Spark is valuable for learning scalable patterns, but Pandas is often simpler and cheaper for data that fits memory."
+        }
+      ],
+      "diagram": [
+        "Source rows",
+        "Spark transformations (lazy)",
+        "Execution plan",
+        "Action → results"
+      ],
+      "tasks": [
+        {
+          "id": "d4a",
+          "title": "Run your first Spark DataFrame • 65 min",
+          "minutes": 65,
+          "brief": "In Databricks, create an in-memory toy payments table and compute total amount by customer. Inspect the result and explain what triggered execution.",
+          "deliverable": "Notebook with actual outputs and your explanation of lazy execution.",
+          "hints": [
+            "Create a DataFrame with customer_id and amount using spark.createDataFrame.",
+            "Try groupBy(...).sum(...), then orderBy(...), then show().",
+            "Pseudocode: create rows; transform with groupBy; aggregate sum; run action; verify hand-calculated totals."
+          ],
+          "reference": {
+            "language": "python",
+            "code": "# Run in a Databricks Python notebook where `spark` exists.\nrows = [(\"A\", 50), (\"A\", 70), (\"B\", 20)]\ndf = spark.createDataFrame(rows, [\"customer\", \"amount\"])\nresult = df.groupBy(\"customer\").sum(\"amount\").orderBy(\"customer\")\nprint([(r[\"customer\"], r[\"sum(amount)\"]) for r in result.collect()])",
+            "expected": "[('A', 120), ('B', 20)]",
+            "run": "Databricks Python notebook with an active Free Edition serverless session"
+          },
+          "checks": [
+            "Spark action identified",
+            "Correct totals",
+            "No collect on a large real dataset"
+          ]
+        },
+        {
+          "id": "d4b",
+          "title": "Join and inspect a query plan • 75 min",
+          "minutes": 75,
+          "brief": "Create a separate customer table (including a customer with no payments), LEFT JOIN to the payments, and compare physical/optimized plans with a simple join. Watch for duplicate rows.",
+          "deliverable": "Screenshot or text of explain() and a short join-grain note.",
+          "hints": [
+            "Think: What is one row of each table?",
+            "Use DataFrame.join(..., \"left\") and explain() to inspect the plan.",
+            "Pseudocode: create customer table; left join; count rows and customer ids; compare plan; explain potential shuffle."
+          ],
+          "reference": null,
+          "checks": [
+            "Row counts checked",
+            "Missing customers handled",
+            "Join cardinality understood"
+          ]
+        },
+        {
+          "id": "d4c",
+          "title": "Scope Project 1 • 70 min",
+          "minutes": 70,
+          "brief": "Choose an openly licensed business dataset suitable for predicting payment delays or late-payment likelihood. Inspect its actual licence, timestamp fields, label, and leakage risks. If licence or data is unclear, create a labeled synthetic sample ONLY for pipeline development and defer model claims.",
+          "deliverable": "A problem.md with user, decision, label, prediction time, metric and leakage checklist.",
+          "hints": [
+            "A business problem needs a user and a decision, not just a Kaggle CSV.",
+            "Prefer a target available after prediction time and features available before it. Verify licence at source.",
+            "Pseudocode: define business action → prediction event → allowed features → baseline → holdout → acceptance metric."
+          ],
+          "reference": null,
+          "checks": [
+            "No invented dataset licence",
+            "Success metric grounded in business costs",
+            "Prediction timestamp defined"
+          ]
+        }
+      ],
+      "break": {
+        "title": "The accidental collect()",
+        "challenge": "Explain why df.collect() on millions of rows can crash a small driver. Rework your notebook to use show(10), limit, or aggregate first. Do not intentionally overload the free compute quota.",
+        "diagnose": "Record where work happens: Spark executors vs Python driver."
+      },
+      "quiz": [
+        {
+          "question": "Spark select and filter are generally…",
+          "choices": [
+            "Actions",
+            "Lazy transformations",
+            "Always database writes",
+            "GPU operations"
+          ],
+          "answer": 1,
+          "explanation": "Transformations build a plan; actions start execution."
+        },
+        {
+          "question": "Which can pull an entire dataset to the driver?",
+          "choices": [
+            "filter",
+            "select",
+            "collect",
+            "withColumn"
+          ],
+          "answer": 2,
+          "explanation": "collect() transfers all returned rows to the driver."
+        },
+        {
+          "question": "Why inspect JOIN cardinality?",
+          "choices": [
+            "To pick font sizes",
+            "To avoid accidental row multiplication",
+            "To encrypt data",
+            "To skip testing"
+          ],
+          "answer": 1,
+          "explanation": "Wrong join grain can silently duplicate data."
+        },
+        {
+          "question": "When would you NOT use Spark?",
+          "choices": [
+            "Small in-memory dataset with simple operations",
+            "Wide distributed dataset",
+            "Large-scale aggregation",
+            "Distributed ETL"
+          ],
+          "answer": 0,
+          "explanation": "Pandas/SQL may be simpler for modest workloads."
+        },
+        {
+          "question": "A dataset without a verified licence should be…",
+          "choices": [
+            "Used publicly regardless",
+            "Treated as unknown until verified",
+            "Assumed MIT",
+            "Uploaded to GitHub"
+          ],
+          "answer": 1,
+          "explanation": "Validate reuse and redistribution rights before publishing data."
+        }
+      ],
+      "cheatsheet": [
+        "DataFrames are lazy transformation plans.",
+        "Actions include count/show/collect.",
+        "Avoid collecting large data to the driver.",
+        "Join grain must be explicitly checked.",
+        "Free Edition can have quota shutdowns.",
+        "Define a timestamp-aware prediction problem before modeling."
+      ],
+      "interview": [
+        "Explain lazy execution in Spark to a junior engineer.",
+        "How do you choose between Pandas, SQL and Spark for a customer pipeline?",
+        "What questions would you ask a customer before building payment-delay prediction?"
+      ],
+      "ship": [
+        "Commit Spark notebook or scripts, not credentials.",
+        "Add the real explain() output and dataset licence evidence.",
+        "Draft bullet: Built an initial PySpark transformation over X records with validated totals (measure X)."
+      ]
+    },
+    {
+      "agenda": [
+        {
+          "time": "0:00–1:00",
+          "label": "LEARN",
+          "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+        },
+        {
+          "time": "1:00–4:30",
+          "label": "BUILD",
+          "detail": "Write the core logic yourself, using the four-level hint ladder."
+        },
+        {
+          "time": "4:30–5:00",
+          "label": "BREAK IT",
+          "detail": "Deliberately reproduce one failure and document the fix."
+        },
+        {
+          "time": "5:00–5:30",
+          "label": "REVIEW",
+          "detail": "Five-question quiz, cheat sheet, and three interview questions."
+        },
+        {
+          "time": "5:30–6:00",
+          "label": "SHIP",
+          "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+        }
+      ],
+      "day": 5,
+      "title": "Delta, quality & medallion",
+      "tagline": "Build data you can trust before building a model.",
+      "outcome": "A small bronze/silver/gold pipeline with explicit data-quality tests and repeatable evidence.",
+      "tier": {
+        "name": "Databricks Free Edition + Delta tables",
+        "status": "Free Edition compute is quota-bound; availability of Unity Catalog permissions and specific workspace features must be checked in your account. Local Python/Parquet can teach the cleaning pattern if Delta features are unavailable.",
+        "url": "https://docs.databricks.com/aws/en/getting-started/free-edition-limitations"
+      },
+      "concepts": [
+        {
+          "title": "Bronze, silver, gold are conventions",
+          "body": "Bronze: preserve raw source with provenance. Silver: clean, type and de-duplicate. Gold: business-ready aggregates or model features. These are architecture labels, not built-in Spark classes."
+        },
+        {
+          "title": "Delta Lake and transactional data",
+          "body": "Delta Lake adds a transaction log and table operations on top of files. Avoid promising every enterprise feature is enabled in Free Edition."
+        },
+        {
+          "title": "Data quality as code",
+          "body": "Define checks for null keys, duplicate business IDs, valid ranges, and plausible dates. Decide whether to reject, quarantine or repair bad records; never silently discard without evidence."
+        }
+      ],
+      "diagram": [
+        "Bronze: raw + origin",
+        "Silver: typed + deduped",
+        "Quality gates",
+        "Gold: usable features"
+      ],
+      "tasks": [
+        {
+          "id": "d5a",
+          "title": "Ingest a reproducible bronze table • 60 min",
+          "minutes": 60,
+          "brief": "Read a small CSV of invoices (or the vetted dataset from Day 4) into a named bronze table or DataFrame. Include source_file and ingestion_time. Show total row count and raw null counts. Do not overwrite your raw copy.",
+          "deliverable": "Notebook output, row counts and provenance fields.",
+          "hints": [
+            "Raw means recoverable, not cleaned in place.",
+            "Use explicit column names; include a reproducible source reference.",
+            "Pseudocode: read source; add ingestion metadata; write raw table; count rows; log source version."
+          ],
+          "reference": null,
+          "checks": [
+            "Keep raw copy",
+            "Row count recorded",
+            "Source and licence documented"
+          ]
+        },
+        {
+          "id": "d5b",
+          "title": "Silver transforms with quality gates • 95 min",
+          "minutes": 95,
+          "brief": "Normalize types, deduplicate on invoice_id with a documented rule, reject negative amounts, and count bad records. Prove that repeated ingestion does not multiply rows.",
+          "deliverable": "Silver table, quality_checks.py, observed pass/fail counts.",
+          "hints": [
+            "Write quality rules before changing records.",
+            "Check null IDs and amounts, duplicate IDs, date ordering, and permitted values.",
+            "Pseudocode: load bronze; validate fields; split valid/quarantine; resolve duplicates by timestamp; assert unique keys; save silver."
+          ],
+          "reference": {
+            "language": "python",
+            "code": "rows = [\n {\"invoice_id\":\"1\", \"amount\":100},\n {\"invoice_id\":\"1\", \"amount\":100},\n {\"invoice_id\":\"2\", \"amount\":-8},\n {\"invoice_id\":\"3\", \"amount\":25},\n]\nseen, good, rejected = set(), [], 0\nfor row in rows:\n    if row[\"amount\"] < 0 or row[\"invoice_id\"] in seen:\n        rejected += 1\n        continue\n    seen.add(row[\"invoice_id\"])\n    good.append(row)\nprint(len(good), rejected)",
+            "expected": "2 2",
+            "run": "python quality_gate.py"
+          },
+          "checks": [
+            "Invalid records counted",
+            "Business key is unique",
+            "Repeated input does not multiply silver rows"
+          ]
+        },
+        {
+          "id": "d5c",
+          "title": "Gold aggregate + repeatable run • 55 min",
+          "minutes": 55,
+          "brief": "Create a gold view with customer-level invoice count, total amount and max overdue days. Document that these are descriptive today: do not leak future labels into later model features. Re-run from raw and compare counts.",
+          "deliverable": "Gold schema and a README table with actual quality metrics.",
+          "hints": [
+            "Gold is tailored for consumers; it is not necessarily a machine-learning feature table yet.",
+            "Use groupBy/SQL GROUP BY with explicit allowed columns; save observed row counts.",
+            "Pseudocode: read silver → group by customer → compute business aggregates → assert row and sum invariants → store gold."
+          ],
+          "reference": null,
+          "checks": [
+            "Counts match after rerun",
+            "No future-only features",
+            "Report failures honestly"
+          ]
+        }
+      ],
+      "break": {
+        "title": "The quiet duplicate",
+        "challenge": "Reingest the same source into your silver step. If your logic simply appends, duplicates appear. Debug and fix using stable business keys and idempotent writes for your chosen environment.",
+        "diagnose": "Compare key uniqueness and counts across two identical runs; record before/after evidence."
+      },
+      "quiz": [
+        {
+          "question": "What should bronze preserve?",
+          "choices": [
+            "Only preprocessed features",
+            "Raw records and provenance",
+            "Only predictions",
+            "Only charts"
+          ],
+          "answer": 1,
+          "explanation": "Bronze stores source data so transformations can be reproduced."
+        },
+        {
+          "question": "What does idempotence mean here?",
+          "choices": [
+            "Every rerun doubles rows",
+            "Repeated identical runs yield the same state",
+            "No logs are kept",
+            "All tables are cached"
+          ],
+          "answer": 1,
+          "explanation": "Idempotent pipelines can be safely rerun."
+        },
+        {
+          "question": "A null primary business key should usually be…",
+          "choices": [
+            "Ignored silently",
+            "Explicitly rejected/quarantined or handled under a rule",
+            "Used as a model feature",
+            "Automatically replaced by 0"
+          ],
+          "answer": 1,
+          "explanation": "Null identifiers can break deduplication and joins."
+        },
+        {
+          "question": "Does MLflow automatically calculate PSI drift?",
+          "choices": [
+            "Yes",
+            "No",
+            "Only with Docker",
+            "Only for SQL"
+          ],
+          "answer": 1,
+          "explanation": "You must implement or integrate drift checks; MLflow tracking alone does not detect drift."
+        },
+        {
+          "question": "Gold should be designed around…",
+          "choices": [
+            "A real data consumer",
+            "The largest table",
+            "The prettiest dashboard",
+            "Random feature count"
+          ],
+          "answer": 0,
+          "explanation": "Gold tables represent curated business needs or downstream features."
+        }
+      ],
+      "cheatsheet": [
+        "Bronze raw; silver validated; gold consumer-ready.",
+        "Document source, licence, provenance and ingestion time.",
+        "Define data-quality checks before cleaning.",
+        "Quarantine or count bad records; do not hide them.",
+        "Idempotence avoids duplicate accumulation on reruns.",
+        "Quality metrics need observed counts, not invented percentages."
+      ],
+      "interview": [
+        "Design a bronze/silver/gold pipeline for messy vendor invoices.",
+        "How do you deal with a source that republishes the same records every day?",
+        "What data-quality tests would prevent silent corruption before model training?"
+      ],
+      "ship": [
+        "Commit pipeline source, tests and a measured quality report.",
+        "README includes actual source licence and row-count table.",
+        "Draft bullet: Built a bronze/silver/gold pipeline with X automated quality checks and repeatable reruns (measure X)."
+      ]
+    }
+  ]
+}
