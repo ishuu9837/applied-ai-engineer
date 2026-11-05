@@ -1,5 +1,5 @@
 {
-  "apiBase": "",
-  "mode": "local-first",
-  "notes": "Set apiBase to an Access-protected Cloudflare Worker URL after activation; never add secrets here."
+  "apiBase": "/api",
+  "mode": "same-origin-accounts",
+  "notes": "Do not store secrets or tokens in public frontend config."
 }

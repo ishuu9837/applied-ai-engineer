@@ -1,3 +1,4 @@
+import {getUser,handleAuth} from './auth.mjs';
 /**
  * Field Academy single-user API. Set Cloudflare Access on the Worker hostname.
  * Only an Access-authenticated request receives ctx.access. Never trust a
@@ -17,14 +18,6 @@ function crossOriginHeaders(req,env){
 }
 const withCORS=(res,extra)=>{const headers=new Headers(res.headers);for(const [k,v] of Object.entries(extra))headers.set(k,v);return new Response(res.body,{status:res.status,headers});};
 async function digest(text){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');}
-async function requestUser(ctx,env){
-  // Cloudflare Access verifies authentication before ctx.access is set.
-  if(!ctx?.access?.getIdentity)return null;
-  if(!env.ALLOWED_EMAIL)return null; // Fail closed until owner is configured.
-  const identity=await ctx.access.getIdentity();
-  if(!identity?.email || identity.email.toLowerCase()!==env.ALLOWED_EMAIL.toLowerCase())return null;
-  return await digest(identity.email.toLowerCase());
-}
 function validProgress(payload){
  if(!payload||typeof payload!=='object'||Array.isArray(payload))return false;
  const approved=['checklist','tasks','hints','acknowledged','quiz','notes','done','coachScores','stageDone','bugHunts'];
@@ -81,22 +74,23 @@ async function artifactsRoute(request,env,userId,path){
  return json({error:'Route or method not found'},404);
 }
 export default {
- async fetch(request,env,ctx){
-  const url=new URL(request.url),headers=crossOriginHeaders(request,env);
-  if(request.method==='OPTIONS'){
-    return withCORS(new Response(null,{status:204}),headers);
+ async fetch(request,env){
+  const url=new URL(request.url);
+  const route=url.pathname.startsWith('/api/')?url.pathname.slice(4):url.pathname;
+  if(route==='/health')return json({status:'ok',database:!!env.DB,storage:!!env.ARTIFACTS});
+  if(!route.startsWith('/auth/')&&!route.startsWith('/v1/')){
+    if(env.ASSETS)return env.ASSETS.fetch(request);
+    return json({error:'Not found'},404);
   }
-  if(request.headers.get('origin') && request.headers.get('origin')!==env.PUBLIC_ORIGIN){return json({error:'Origin not permitted'},403);}
-  if(url.pathname==='/health')return withCORS(json({status:'ok',storage:'bound only after activation'}),headers);
+  if(request.method!=='GET'&&request.method!=='HEAD'&&request.headers.get('origin')!==url.origin)return json({error:'Origin not permitted'},403);
+  if(!env.DB)return json({error:'D1 database binding DB is required'},503);
   try {
-   const id=await requestUser(ctx,env);
-   if(!id)return withCORS(json({error:'Cloudflare Access authentication required'},401),headers);
-   if(!env.DB||!env.ARTIFACTS)return withCORS(json({error:'D1 and R2 bindings required'},503),headers);
-   let response;
-   if(url.pathname==='/v1/progress')response=await progressRoute(request,env,id);
-   else if(url.pathname.startsWith('/v1/artifacts'))response=await artifactsRoute(request,env,id,url.pathname);
-   else response=json({error:'Not found'},404);
-   return withCORS(response,headers);
-  }catch(error){console.error('API error',error?.message||'unknown');return withCORS(json({error:'Internal server error'},500),headers);}
+   if(route.startsWith('/auth/'))return handleAuth(request,env,route);
+   const user=await getUser(request,env);
+   if(!user)return json({error:'Sign in required'},401);
+   if(route==='/v1/progress')return progressRoute(request,env,user.id);
+   if(route.startsWith('/v1/artifacts'))return artifactsRoute(request,env,user.id,route);
+   return json({error:'Not found'},404);
+  }catch(error){console.error('API error',error?.message||'unknown');return json({error:'Internal server error'},500);}
  }
 };

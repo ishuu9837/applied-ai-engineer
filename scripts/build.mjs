@@ -14,7 +14,7 @@ fs.writeFileSync(path.join(dist,'.nojekyll'),'');
 if(preview){
  const source=path.join(root,'content/queue/2026-11-06.json');
  const batch=JSON.parse(fs.readFileSync(source,'utf8'));
- const p=path.join(dist,'content/live','public-config.json');
+ const p=path.join(dist,'content/live');
  for(const lesson of batch.days){fs.writeFileSync(path.join(p,`day-${String(lesson.day).padStart(2,'0')}.json`),JSON.stringify(lesson,null,2));}
  const catalog={schemaVersion:1,updatedAtIST:'2026-11-06',releasedDays:[1,2,3],lastReleaseDate:'2026-11-06'};
  fs.writeFileSync(path.join(p,'catalog.json'),JSON.stringify(catalog,null,2));

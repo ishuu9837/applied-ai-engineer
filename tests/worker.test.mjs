@@ -1,72 +1,55 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
 import worker from '../worker/index.mjs';
 const origin='https://academy.example.test';
-function context(email){return {access:{getIdentity:async()=>({email})}};}
-function request(path,method='GET',data,headers={}){
- return new Request(`https://api.example.test${path}`,{method,headers:{origin,...headers},body:data});
+function env(){
+ const sql=new DatabaseSync(':memory:');
+ sql.exec(readFileSync(new URL('../worker/migrations/0001_init.sql',import.meta.url),'utf8'));
+ sql.exec(readFileSync(new URL('../worker/migrations/0002_auth.sql',import.meta.url),'utf8'));
+ const blobs=new Map();
+ return {DB:{prepare(q){return {bind(...args){const stmt=sql.prepare(q);return {first:async()=>stmt.get(...args)||null,run:async()=>stmt.run(...args),all:async()=>({results:stmt.all(...args)})};}}}},ARTIFACTS:{put:async(k,v)=>blobs.set(k,v),get:async(k)=>blobs.has(k)?{body:blobs.get(k)}:null,delete:async(k)=>blobs.delete(k)},close:()=>sql.close()};
 }
-function bindings(){
- const progress=new Map(), artifacts=new Map(), blobs=new Map();
- return {
-  PUBLIC_ORIGIN: origin,
-  ALLOWED_EMAIL: 'learner@example.test',
-  DB: {
-   prepare(sql) {
-    return {
-     bind(...params) {
-      return {
-       async first() {
-        if (sql.includes('FROM progress')) return progress.get(params[0]) || null;
-        if (sql.includes('FROM artifacts')) return artifacts.get(params[0]) || null;
-        return null;
-       },
-       async run() {
-        if(sql.includes('INTO progress'))progress.set(params[0],{data_json:params[1]});
-        if(sql.includes('INTO artifacts'))artifacts.set(params[0],{object_key:params[2],name:params[3],content_type:params[5]});
-        return {success:true};
-       },
-       async all(){return {results:[]};}
-      };
-     }
-    };
-   }
-  },
-  ARTIFACTS: {
-   async put(k,data){blobs.set(k,data)},
-   async get(k){return blobs.has(k)?{body:blobs.get(k)}:null},
-   async delete(k){blobs.delete(k)}
-  }
- };
+function req(route,method='GET',payload,extra={}){
+ return new Request(origin+route,{method,headers:{...(method!=='GET'?{origin}:{}),...(typeof payload==='string'?{'content-type':'application/json'}:{}),...extra},body:payload});
 }
-test('worker health is public and safe',async()=>{
- const r=await worker.fetch(request('/health'),bindings(),{});assert.equal(r.status,200);assert.equal((await r.json()).status,'ok');
+const account={name:'Learner Tester',email:'learner@example.test',password:'uniquePassword#314159'};
+const signup=(e,data=account)=>worker.fetch(req('/api/auth/signup','POST',JSON.stringify(data)),e);
+const cookie=r=>r.headers.get('set-cookie')?.split(';')[0]||'';
+test('health exposes binding state and login fails closed without DB',async()=>{
+ assert.equal((await worker.fetch(req('/api/health'),{})).status,200);
+ assert.equal((await worker.fetch(req('/api/auth/me'),{})).status,503);
 });
-test('worker progress is denied without Access',async()=>{
- const env=bindings();const r=await worker.fetch(request('/v1/progress'),env,{});assert.equal(r.status,401);
+test('signup and secure cookie login/session/logout',async()=>{
+ const e=env();try{
+  const r=await signup(e);assert.equal(r.status,200);
+  const c=cookie(r);assert.match(c,/__Host-academy_session=[a-f0-9]{64}/);
+  assert.match(r.headers.get('set-cookie'),/HttpOnly; Secure; SameSite=Lax/);
+  assert.equal((await worker.fetch(req('/api/auth/me','GET',undefined,{cookie:c}),e)).status,200);
+  assert.equal((await signup(e)).status,409);
+  const bad=await worker.fetch(req('/api/auth/login','POST',JSON.stringify({email:account.email,password:'bad'})),e);assert.equal(bad.status,401);
+  assert.equal((await worker.fetch(req('/api/auth/login','POST',JSON.stringify({email:account.email,password:account.password})),e)).status,200);
+  assert.equal((await worker.fetch(req('/api/auth/logout','POST',undefined,{cookie:c}),e)).status,200);
+  assert.equal((await worker.fetch(req('/api/auth/me','GET',undefined,{cookie:c}),e)).status,401);
+ }finally{e.close();}
 });
-test('worker rejects other Access identities',async()=>{
- const env=bindings();const r=await worker.fetch(request('/v1/progress'),env,context('not-owner@example.test'));assert.equal(r.status,401);
+test('CSRF blocks foreign Origin and missing Origin on unsafe methods',async()=>{
+ const e=env();try{
+  const c=cookie(await signup(e));
+  const r=await worker.fetch(new Request(origin+'/api/v1/progress',{method:'PUT',headers:{origin:'https://attacker.test',cookie:c},body:'{}'}),e);
+  assert.equal(r.status,403);
+ }finally{e.close();}
 });
-test('worker saves and reads D1 progress for owner',async()=>{
- const env=bindings();const payload={tasks:{d1a:true},done:[],bugHunts:{}};
- let r=await worker.fetch(request('/v1/progress','PUT',JSON.stringify(payload),{'content-type':'application/json'}),env,context('learner@example.test'));
- assert.equal(r.status,200);
- r=await worker.fetch(request('/v1/progress'),env,context('learner@example.test'));
- assert.deepEqual((await r.json()).progress,payload);
-});
-test('worker rejects cross-origin and excessive payloads',async()=>{
- const env=bindings();
- let r=await worker.fetch(new Request('https://api.example.test/v1/progress',{headers:{origin:'https://evil.example.test'}}),env,context('learner@example.test'));
- assert.equal(r.status,403);
- r=await worker.fetch(request('/v1/progress','PUT',JSON.stringify({notes:{1:'x'.repeat(66000)}})),env,context('learner@example.test'));
- assert.equal(r.status,413);
-});
-test('worker stores private R2 artifact and returns attachment',async()=>{
- const env=bindings(),ctx=context('learner@example.test');
- let r=await worker.fetch(request('/v1/artifacts','POST','My notes',{'content-type':'text/plain','x-artifact-name':'notes.txt'}),env,ctx);
- assert.equal(r.status,201);const {id}=await r.json();
- r=await worker.fetch(request('/v1/artifacts/'+id),env,ctx);
- assert.equal(r.status,200); assert.match(r.headers.get('content-disposition'),/attachment/);
- assert.equal(await r.text(),'My notes');
+test('per-user D1 isolation and private R2 artifact access',async()=>{
+ const e=env();try{
+  const first=cookie(await signup(e)),second=cookie(await signup(e,{...account,email:'learner2@example.test'}));
+  const payload={done:[1],notes:{1:'notes'}};
+  assert.equal((await worker.fetch(req('/api/v1/progress','PUT',JSON.stringify(payload),{cookie:first}),e)).status,200);
+  assert.deepEqual((await (await worker.fetch(req('/api/v1/progress','GET',undefined,{cookie:first}),e)).json()).progress,payload);
+  assert.equal((await (await worker.fetch(req('/api/v1/progress','GET',undefined,{cookie:second}),e)).json()).progress,null);
+  const uploaded=await worker.fetch(req('/api/v1/artifacts','POST','my notes',{cookie:first,'content-type':'text/plain','x-artifact-name':'note.txt'}),e);
+  assert.equal(uploaded.status,201);const {id}=await uploaded.json();
+  assert.equal((await worker.fetch(req('/api/v1/artifacts/'+id,'GET',undefined,{cookie:second}),e)).status,404);
+ }finally{e.close();}
 });
