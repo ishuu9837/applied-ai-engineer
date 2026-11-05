@@ -1,0 +1,221 @@
+{
+  "agenda": [
+    {
+      "time": "0:00–1:00",
+      "label": "LEARN",
+      "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+    },
+    {
+      "time": "1:00–4:30",
+      "label": "BUILD",
+      "detail": "Write the core logic yourself, using the four-level hint ladder."
+    },
+    {
+      "time": "4:30–5:00",
+      "label": "BREAK IT",
+      "detail": "Deliberately reproduce one failure and document the fix."
+    },
+    {
+      "time": "5:00–5:30",
+      "label": "REVIEW",
+      "detail": "Five-question quiz, cheat sheet, and three interview questions."
+    },
+    {
+      "time": "5:30–6:00",
+      "label": "SHIP",
+      "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+    }
+  ],
+  "day": 3,
+  "title": "FastAPI + Docker",
+  "tagline": "Your first tiny service with an honest contract.",
+  "outcome": "A working prediction-like API stub with request validation, health endpoint, tests, and a local container.",
+  "tier": {
+    "name": "FastAPI, Pydantic, Docker or Podman",
+    "status": "Free when running locally. Docker Desktop licensing depends on organization size/use; use free Podman if not eligible. Verify currently installed package versions before the lab; avoid unpinned production versions.",
+    "url": "https://docs.docker.com/subscription/desktop-license/"
+  },
+  "concepts": [
+    {
+      "title": "HTTP contracts",
+      "body": "A request has method, path, headers and body. Your API should validate untrusted input, return understandable errors, and respond predictably.",
+      "deep": "HTTP methods define how a client communicates intent: GET retrieves state; POST submits new data. Status codes communicate outcomes: 200 for success, 422 for schema validation failures in FastAPI, and 500 for unexpected server bugs. Your response contract must be explicit about field types, allowed values and errors.\n\nWrite the pure scoring rule separately from the route. That gives you fast unit tests without booting a server, and a clean way to replace the rule with an ML model later. A deterministic rule is not a machine-learning system; label it accurately in the response.",
+      "mentalModel": "JSON request → validation → pure function → JSON response / typed error.",
+      "exercise": "Predict the response for a missing required field and a negative amount.",
+      "pitfall": "An HTTP 200 with `{\"error\":\"invalid\"}` masks failures from monitoring."
+    },
+    {
+      "title": "Pydantic + FastAPI",
+      "body": "Pydantic validates typed request models at runtime. FastAPI uses these types to generate OpenAPI documentation. Validation is not authentication.",
+      "deep": "Pydantic models describe untrusted request data. Use `Field(ge=0)` to reject negatives at the boundary, and choose strictness deliberately: implicit conversion can be useful for forms but surprising for APIs. FastAPI automatically exposes OpenAPI documentation so clients can inspect contracts.\n\nUse `fastapi.testclient.TestClient` to exercise your routes. Check both body and status; a passing success test does not prove invalid inputs are handled. Pin dependency versions after checking them rather than copying stale pins from a tutorial.",
+      "mentalModel": "The schema is executable documentation and the first security boundary.",
+      "exercise": "Write one test asserting invalid amount receives status 422, not 500.",
+      "pitfall": "Validation does not replace authorization, input size limits, or secret management."
+    },
+    {
+      "title": "Container boundaries",
+      "body": "Docker packages your application and dependencies. It does not automatically secure your API or guarantee observability.",
+      "deep": "A container packages the application with a known runtime, dependencies and startup command. It does not magically make your API secure or fault tolerant. The Docker build context is everything `docker build` can see, so `.dockerignore` is critical: exclude `.env`, `.git` and local caches.\n\nUse one service, port 8000 and a `/health` endpoint. Verify that the request reaches the container rather than the old local process. When comparing Docker vs Podman, the goal is understanding image, container, port mapping and environment boundaries, not learning every command.",
+      "mentalModel": "Source + dependencies → image → isolated process → mapped HTTP port.",
+      "exercise": "Explain the difference between EXPOSE 8000 and docker run -p 8000:8000.",
+      "pitfall": "Do not COPY . into the image before defining a `.dockerignore`."
+    }
+  ],
+  "diagram": [
+    "JSON request",
+    "Pydantic validation",
+    "Pure scoring function",
+    "JSON response"
+  ],
+  "tasks": [
+    {
+      "id": "d3a",
+      "title": "Create /health and /score endpoints • 90 min",
+      "minutes": 90,
+      "brief": "Make /health return a stable status. Define a strict request schema for an invoice with amount and days_overdue. Implement your OWN scoring rule as a temporary deterministic stub, labeled a rule, not an ML model.",
+      "deliverable": "main.py, sample request/response, and API contract in README.",
+      "hints": [
+        "Start with a pure function separate from the web endpoint.",
+        "Use a Pydantic BaseModel with Field constraints; then call your function from a POST route.",
+        "Pseudocode: parse request model; reject negative amount; compute a simple rule; serialize score and rule version."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\nclass Invoice(BaseModel):\n    amount: float = Field(ge=0)\n    days_overdue: int = Field(ge=0)\n\n\ndef risk_rule(days_overdue: int) -> bool:\n    return days_overdue >= 30\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok'}\n\n@app.post('/score')\ndef score(invoice: Invoice):\n    return {'risk_flag': risk_rule(invoice.days_overdue), 'kind': 'rule_only'}\n",
+        "run": "python -m pip install fastapi uvicorn && uvicorn main:app --port 8000; then curl http://127.0.0.1:8000/health",
+        "expected": "GET /health → {\"status\":\"ok\"}; POST /score with {\"amount\":200,\"days_overdue\":45} → {\"risk_flag\":true,\"kind\":\"rule_only\"}"
+      },
+      "checks": [
+        "Reject negative values",
+        "Separate pure function from HTTP",
+        "Do not call stub an ML model"
+      ]
+    },
+    {
+      "id": "d3b",
+      "title": "Write endpoint tests • 60 min",
+      "minutes": 60,
+      "brief": "Test GET /health, valid POST, and invalid POST with negative amount. Verify the error is a 4xx, not a 500.",
+      "deliverable": "test_main.py and real pytest output.",
+      "hints": [
+        "HTTP testing checks both status codes and response bodies.",
+        "Use fastapi.testclient.TestClient; httpx is required by TestClient and must be installed.",
+        "Pseudocode: create client; call routes; assert expected status and response; send invalid input and assert validation error."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "from fastapi.testclient import TestClient\nfrom main import app\n\nclient = TestClient(app)\n\ndef test_health():\n    r = client.get('/health')\n    assert r.status_code == 200 and r.json() == {'status': 'ok'}\n\ndef test_score():\n    r = client.post('/score', json={'amount': 200, 'days_overdue': 45})\n    assert r.status_code == 200 and r.json()['risk_flag'] is True\n\ndef test_invalid():\n    r = client.post('/score', json={'amount': -1, 'days_overdue': 45})\n    assert r.status_code == 422\n",
+        "run": "Save as test_main.py next to main.py from Lab 1; python -m pip install pytest httpx fastapi && python -m pytest -q test_main.py",
+        "expected": "3 passed (test duration varies)"
+      },
+      "checks": [
+        "2xx for valid input",
+        "4xx for invalid data",
+        "Health check independent of scoring"
+      ]
+    },
+    {
+      "id": "d3c",
+      "title": "Containerize and smoke-test • 60 min",
+      "minutes": 60,
+      "brief": "Create a small Python Dockerfile, install pinned requirements after checking versions, expose port 8000, and test the app from your laptop. Do not copy .env into the image.",
+      "deliverable": "Dockerfile, .dockerignore, exact working build/run commands.",
+      "hints": [
+        "A container needs a working directory, dependencies, source and a foreground process.",
+        "Use python:3.12-slim, WORKDIR, COPY requirements, pip install, COPY app, and CMD uvicorn.",
+        "Pseudocode: build image; run with port mapping; GET /health; inspect logs; stop container."
+      ],
+      "reference": {
+        "language": "dockerfile",
+        "code": "FROM python:3.12-slim\nWORKDIR /app\nRUN pip install --no-cache-dir fastapi uvicorn\nCOPY main.py /app/main.py\nEXPOSE 8000\nCMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n",
+        "run": "Save as Dockerfile next to main.py; write .dockerignore containing .env and .git; run docker build -t aae-api . && docker run --rm -p 8000:8000 aae-api; in another terminal curl http://localhost:8000/health",
+        "expected": "HTTP 200 {\"status\":\"ok\"} after server starts; pin dependencies after checking actual versions"
+      },
+      "checks": [
+        "Avoid baking API keys",
+        "Use .dockerignore",
+        "Health check succeeds"
+      ]
+    }
+  ],
+  "break": {
+    "title": "Invalid request path",
+    "challenge": "Send {\"amount\":-10,\"days_overdue\":45} to /score. Observe the validation response. Then send a string where a number is expected and explain coercion/strict-mode tradeoffs.",
+    "diagnose": "Distinguish 422 validation errors from 500 programming errors; capture the real HTTP status."
+  },
+  "quiz": [
+    {
+      "question": "Which HTTP method is most natural for scoring a JSON body?",
+      "choices": [
+        "GET",
+        "POST",
+        "DELETE",
+        "HEAD"
+      ],
+      "answer": 1,
+      "explanation": "POST accepts a request body with explicit input data."
+    },
+    {
+      "question": "Does Pydantic replace authorization?",
+      "choices": [
+        "Yes",
+        "No",
+        "Only with Docker",
+        "Only on cloud"
+      ],
+      "answer": 1,
+      "explanation": "Input validation and access control address different risks."
+    },
+    {
+      "question": "An invalid input should usually result in…",
+      "choices": [
+        "5xx always",
+        "A clear client error response",
+        "Process crash",
+        "Silent default"
+      ],
+      "answer": 1,
+      "explanation": "Return a meaningful 4xx code when the client sends invalid data."
+    },
+    {
+      "question": "Does a Dockerfile keep secrets out automatically?",
+      "choices": [
+        "Yes",
+        "No",
+        "Only on Linux",
+        "Only if public"
+      ],
+      "answer": 1,
+      "explanation": "Avoid copying .env and supply secrets at runtime."
+    },
+    {
+      "question": "What is a health check for?",
+      "choices": [
+        "Proving ML accuracy",
+        "Signaling basic service availability",
+        "Encrypting requests",
+        "Installing packages"
+      ],
+      "answer": 1,
+      "explanation": "Health endpoints indicate if a service is alive; they do not prove predictions are correct."
+    }
+  ],
+  "cheatsheet": [
+    "GET reads; POST submits data.",
+    "422 often indicates FastAPI/Pydantic validation errors.",
+    "Request schema is a contract; reject unsafe inputs.",
+    "Business logic belongs outside route handlers.",
+    "Container ≠ secure deployment; manage secrets and dependencies.",
+    "Test valid, invalid, and boundary requests."
+  ],
+  "interview": [
+    "What would you change before exposing this API to a customer?",
+    "Why test the pure scoring function separately from the FastAPI endpoint?",
+    "How do you avoid leaking credentials in a Docker image?"
+  ],
+  "ship": [
+    "Commit FastAPI app, tests and Dockerfile.",
+    "Record actual curl samples and container run result.",
+    "Draft bullet: Built a containerized FastAPI service with X tested endpoints (replace X after your run)."
+  ]
+}
