@@ -44,15 +44,17 @@ npm run dev
 
 Expected: `content/live/day-01.json` through `day-05.json` are written, and catalog shows five days. **Do not commit a simulated early release before its real date.** Use this for review or in a disposable copy.
 
-## Publish to GitHub Pages
+## Deploy to Vercel (Hobby, no paid services)
 
-1. Create a **public** GitHub repository named `applied-ai-engineer` under `ishuu9837`, with **no generated README** (this package already has one).
-2. Commit and push all files to the `main` branch **except generated `dist/`**. GitHub Actions workflows must be allowed on the repository.
-3. Go to **Settings → Pages → Build and deployment → Source → GitHub Actions**.
-4. Let `Validate, publish and deploy learning site` run on `main`. Initial website content and the roadmap can deploy on November 5, but lesson details remain unavailable until the first midnight release.
-5. The intended project site URL is `https://ishuu9837.github.io/applied-ai-engineer/` **after a successful deployment**. Do not assume it is live until Actions shows success and the URL loads.
+1. The GitHub repository `ishuu9837/applied-ai-engineer` is the source of truth, with production branch `main`.
+2. The Vercel Git-linked project uses `vercel.json`: framework **Other** (no framework), build command `npm run build`, and output directory `dist`.
+3. Every push to `main` creates a new production build automatically. Vercel should be used only for hosting; it must not generate lessons or require any secret API keys.
+4. GitHub Actions (not Vercel Cron) runs at `00:00 Asia/Kolkata`. It validates the prepared five-day batch, commits released lesson JSON files to `content/live`, and keeps the schedule marker. The next Git push is intended to trigger the Vercel deployment.
+5. Verify Git-generated commits actually deploy in the connected Vercel Hobby project, especially the GitHub Actions bot-authored release commits; use the Vercel dashboard to redeploy the release manually if necessary.
+6. GitHub Actions schedules are **best effort**: the workflow may run late or be dropped. Use the workflow's **Run workflow** button to recover a missed release.
+7. The first production build can show the roadmap before November 6, while Days 1–5 remain locked until they are actually published. There is **no requirement to enable GitHub Pages**.
 
-**Midnight logic:** The workflow uses `cron: '0 0 * * *'` and `timezone: 'Asia/Kolkata'` (supported in GitHub Actions in 2026). GitHub schedules are best-effort, not an exact-time SLA: runs can be late or skipped. Use **Actions → Validate, publish and deploy learning site → Run workflow** as a manual recovery. A `day-status.json` marker records each day of the November 6–25 sprint. The workflow commits newly released material and deploys in the *same run*, so it does not depend on a token-created commit triggering another workflow.
+**Security:** Only `dist/` files are served. The build script does not copy `content/queue` into the site. The GitHub repository is public, so queued lesson content is visible in source before its release. Never commit API keys or private customer data.
 
 ## Batch queue: prepare, review, release
 
@@ -96,7 +98,7 @@ applied-ai-engineer/
 
 ## Cost, reliability and security
 
-- **Site hosting:** GitHub Pages is available for public GitHub Free repositories. Check GitHub Actions quotas/settings; only one small scheduled deployment job is required daily during the sprint.
+- **Site hosting:** Vercel Hobby is available at no charge for personal/non-commercial use, subject to usage quotas. GitHub Actions provides the small scheduled publishing job.
 - **Databricks:** Free Edition is fair-use/serverless with compute shutdowns when quotas are reached. Verify current workspace restrictions before every Spark lab.
 - **Docker:** Docker Desktop has licence conditions; Podman is a free local alternative.
 - **LLMs:** Paid keys are not required by this site. Do not put any API key in JavaScript, Git, README or customer examples.
@@ -106,7 +108,9 @@ applied-ai-engineer/
 ## Verified official resources
 
 - https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onschedule
-- https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
+- https://vercel.com/docs/git
+- https://vercel.com/docs/project-configuration/vercel-json
+- https://vercel.com/docs/plans/hobby
 - https://docs.databricks.com/aws/en/getting-started/free-edition-limitations
 - https://docs.docker.com/subscription/desktop-license/
 
