@@ -1,0 +1,5 @@
+{
+  "apiBase": "",
+  "mode": "local-first",
+  "notes": "Set apiBase to an Access-protected Cloudflare Worker URL after activation; never add secrets here."
+}

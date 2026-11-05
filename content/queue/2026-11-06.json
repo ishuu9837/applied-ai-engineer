@@ -43,15 +43,27 @@
       "concepts": [
         {
           "title": "From notebook to product",
-          "body": "Exploratory notebooks are excellent for research. A delivered AI application additionally needs repeatable installs, tests, configuration, safe inputs, and predictable failures."
+          "body": "Exploratory notebooks are excellent for research. A delivered AI application additionally needs repeatable installs, tests, configuration, safe inputs, and predictable failures.",
+          "deep": "A notebook proves that an idea can be explored; a product must make the same decision correctly when a new person calls it tomorrow. Move transformation logic into small importable functions. Express assumptions as types and validation, then use tests to specify edge cases. Keep credentials outside Git and environments reproducible.\n\nFor this sprint a 'shipped' feature requires a documented input/output contract, a test that can fail, a repeatable command, a named limitation and evidence of what ran. Docker and cloud hosting do not automatically satisfy those requirements. An API without stable error behavior is still an experiment.",
+          "mentalModel": "Exploration → deterministic function → tests → API → deployment.",
+          "exercise": "Take a notebook cell you use often. Write its function signature, one invalid input and one test that should fail when the logic is broken.",
+          "pitfall": "Do not hide invalid data with try/except: pass; observable failure is part of reliability."
         },
         {
           "title": "Your two-hour diagnostic",
-          "body": "Set a two-hour timer during BUILD. Work independently: Python (30 min), SQL (30 min), Pandas (30 min), ML reasoning (30 min). Write down where you were slow. Do not ask AI for the answer before attempting."
+          "body": "Set a two-hour timer during BUILD. Work independently: Python (30 min), SQL (30 min), Pandas (30 min), ML reasoning (30 min). Write down where you were slow. Do not ask AI for the answer before attempting.",
+          "deep": "The diagnostic is not a speed contest. Python: parse dirty inputs and test error cases. SQL: aggregate and preserve customers who have no orders. Pandas: group and clean without a row-wise loop. ML: explain leakage and choose a metric for a business cost. Each exercise is exactly 30 minutes; stop when its timebox ends.\n\nMark an answer as independent only if you wrote it before hints. Record the first failure, the fix and the new test. The goal is to identify gaps: being strong in PyTorch does not mean you can reliably join data or design an HTTP contract.",
+          "mentalModel": "Four probes × 30 minutes = one evidence-based gap list.",
+          "exercise": "Before coding, write what the output should be for a one-row and an empty input.",
+          "pitfall": "An LLM-generated answer is not your diagnostic score."
         },
         {
           "title": "Quality gate",
-          "body": "Typing, linting, tests and environment variables are not ceremony. They let a colleague change your code without guessing what it does, and keep secrets out of Git."
+          "body": "Typing, linting, tests and environment variables are not ceremony. They let a colleague change your code without guessing what it does, and keep secrets out of Git.",
+          "deep": "A quality gate makes a broken change visible before users see it. `pytest` checks behavioral expectations. `ruff check` detects lint and common issues. Type hints communicate expectations but do not validate runtime values; `mypy` can be introduced later when useful. A `.gitignore` excludes untracked files, but cannot revoke leaked secrets or remove secrets already committed.\n\nSet up a small `src/` layout and test just one function today. Keep `README` commands copyable. Do not introduce ten tools because a real project should minimize dependencies and make failures understandable.",
+          "mentalModel": "Write → run tests → lint → inspect Git diff → commit.",
+          "exercise": "Name a specific failure each quality check would catch.",
+          "pitfall": "Never commit `.env`, personal data or notebook outputs containing credentials."
         }
       ],
       "diagram": [
@@ -74,9 +86,9 @@
           ],
           "reference": {
             "language": "python",
-            "code": "def summarize(values):\n    total, bad = 0, 0\n    for value in values:\n        try:\n            number = int(value)\n            if number < 0 or isinstance(value, bool):\n                bad += 1\n                continue\n            total += number\n        except (ValueError, TypeError):\n            bad += 1\n    return total, bad\n\nprint(summarize([\"10\", \"oops\", \"20\", None, \"30\"]))",
-            "expected": "(60, 2)",
-            "run": "python diagnostic.py"
+            "code": "def summarize(values):\n    total, bad = 0, 0\n    for value in values:\n        try:\n            if isinstance(value, bool):\n                raise ValueError('booleans are not numbers')\n            number = int(value)\n            if number < 0:\n                raise ValueError('negative number')\n            total += number\n        except (ValueError, TypeError):\n            bad += 1\n    return total, bad\n\nassert summarize([]) == (0, 0)\nassert summarize([True, -1, 'oops', None]) == (0, 4)\nprint(summarize(['10', 'oops', '20', None, '30']))\n",
+            "run": "python diagnostic.py",
+            "expected": "(60, 2)"
           },
           "checks": [
             "Empty list",
@@ -96,7 +108,12 @@
             "GROUP BY handles revenue; LEFT JOIN exposes missing matches; ROW_NUMBER can rank orders.",
             "Pseudocode: group orders by customer for revenue; left join customers to orders for zero orders; rank per customer by date then order id."
           ],
-          "reference": null,
+          "reference": {
+            "language": "python",
+            "code": "import sqlite3\n\ncon = sqlite3.connect(':memory:')\ncon.executescript('''\nCREATE TABLE customers(id TEXT PRIMARY KEY);\nCREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id TEXT, amount INTEGER);\nINSERT INTO customers VALUES ('A'), ('B'), ('C');\nINSERT INTO orders VALUES (1,'A',50),(2,'A',70),(3,'B',20);\n''')\nrevenue = con.execute('''\nSELECT c.id, COALESCE(SUM(o.amount),0) AS revenue\nFROM customers c LEFT JOIN orders o ON c.id=o.customer_id\nGROUP BY c.id ORDER BY c.id\n''').fetchall()\nlatest = con.execute('''\nWITH ranked AS (\n SELECT customer_id, id, ROW_NUMBER() OVER (\n PARTITION BY customer_id ORDER BY id DESC) rn FROM orders\n)\nSELECT customer_id, id FROM ranked WHERE rn=1 ORDER BY customer_id\n''').fetchall()\nprint(revenue)\nprint(latest)\n",
+            "run": "python sql_diagnostic.py",
+            "expected": "[('A', 120), ('B', 20), ('C', 0)] then [('A', 2), ('B', 3)]"
+          },
           "checks": [
             "Include a customer with zero orders",
             "Handle tied dates deterministically"
@@ -113,7 +130,12 @@
             "Look at drop_duplicates, fillna, groupby, and how filtering treats missing values.",
             "Pseudocode: inspect null counts; remove duplicates by business key; handle missing columns with a stated rule; aggregate by category."
           ],
-          "reference": null,
+          "reference": {
+            "language": "python",
+            "code": "import pandas as pd\nrows = [('A',20),('A',20),('A',None),('B',5),('B',3),\n        ('B',None),('C',9),('C',1),('C',7),('D',4)]\ndf = pd.DataFrame(rows, columns=['customer','amount'])\nclean = df.drop_duplicates().dropna(subset=['amount']).copy()\nclean['amount'] = pd.to_numeric(clean['amount'])\nprint(clean.groupby('customer')['amount'].sum().to_dict())\nprint(f'raw={len(df)}, clean={len(clean)}')\n",
+            "run": "python -m pip install pandas && python pandas_diagnostic.py",
+            "expected": "{'A': 20.0, 'B': 8.0, 'C': 17.0, 'D': 4.0}; raw=10, clean=7"
+          },
           "checks": [
             "Explain duplicate key choice",
             "Report null count before cleaning"
@@ -130,7 +152,12 @@
             "A feature collected after the label outcome may leak the answer.",
             "Pseudocode: define timestamp of prediction; list known features; remove future-only features; choose baseline; evaluate beyond one metric."
           ],
-          "reference": null,
+          "reference": {
+            "language": "python",
+            "code": "# A highly imbalanced example: 95 paid on time, 5 late.\n# A classifier that always says \"on time\" gets 95% accuracy\n# yet catches ZERO late payments.\nactual = [0] * 95 + [1] * 5\npred = [0] * 100\ncorrect = sum(a == p for a, p in zip(actual, pred))\nlate_recall = sum(a == 1 and p == 1 for a, p in zip(actual, pred)) / sum(actual)\nprint(f'accuracy={correct/len(actual):.0%}, late_recall={late_recall:.0%}')\n",
+            "run": "python ml_diagnostic.py",
+            "expected": "accuracy=95%, late_recall=0%"
+          },
           "checks": []
         },
         {
@@ -144,7 +171,12 @@
             "Use python -m venv .venv, pip install pytest ruff, and run python -m pytest followed by ruff check .",
             "Pseudocode: create folders; make environment; add dependencies; write function; write test; run checks; commit only source/config/documentation."
           ],
-          "reference": null,
+          "reference": {
+            "language": "bash",
+            "code": "mkdir -p src/aae tests\npython -m venv .venv\n# macOS / Linux (Windows PowerShell uses .venv\\Scripts\\Activate.ps1)\nsource .venv/bin/activate\npython -m pip install pytest ruff\nprintf 'def add(a: int, b: int) -> int:\\n    return a + b\\n' > src/aae/__init__.py\nprintf 'from aae import add\\ndef test_add():\\n    assert add(2, 3) == 5\\n' > tests/test_add.py\nprintf '[tool.pytest.ini_options]\\npythonpath = [\"src\"]\\n' > pyproject.toml\nprintf '.venv/\\n.env\\n__pycache__/\\n.pytest_cache/\\n' > .gitignore\npython -m pytest -q\nruff check src tests\n",
+            "run": "Save as setup.sh, then bash setup.sh in an empty folder with Python installed",
+            "expected": "1 passed; All checks passed! (versions and timings vary)"
+          },
           "checks": [
             "At least 1 passing test",
             "Ruff reports no errors",
@@ -274,15 +306,27 @@
       "concepts": [
         {
           "title": "SQL grain is everything",
-          "body": "Before joining tables, state what one row represents. An accidental one-to-many JOIN can duplicate amounts and silently corrupt revenue totals."
+          "body": "Before joining tables, state what one row represents. An accidental one-to-many JOIN can duplicate amounts and silently corrupt revenue totals.",
+          "deep": "Grain means 'what does a row represent?' An invoice table has one row per invoice. A customer table has one row per customer. Joining them creates one row per invoice, not one row per customer. If you sum a customer-level balance after that join, the balance is repeated and your aggregate is wrong.\n\nA correct financial query separates invoice-level and customer-level calculations. Group to the desired grain before joining aggregates. Use `LEFT JOIN` when customers with zero invoices must remain visible, and `COALESCE` only when a missing aggregate truly means zero.",
+          "mentalModel": "Define row grain first, then joins, then aggregation.",
+          "exercise": "If a customer has three invoices, how many rows should the joined table have? Explain what can be summed safely.",
+          "pitfall": "SELECT DISTINCT is not a substitute for correcting a wrong join."
         },
         {
           "title": "CTE versus window function",
-          "body": "CTEs name intermediate queries. A window function computes values across a partition while retaining individual rows. A GROUP BY collapses rows."
+          "body": "CTEs name intermediate queries. A window function computes values across a partition while retaining individual rows. A GROUP BY collapses rows.",
+          "deep": "A CTE (`WITH name AS (...)`) names a subquery so each transformation is readable and testable. A window function computes values across a partition without collapsing rows. For `ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY invoice_date DESC, invoice_id DESC)`, tie-breaking by the invoice ID makes results deterministic.\n\nTo find the latest invoice and the total unpaid overdue amount, compute them in separate CTEs and join those results to customers. When an ordering field is missing or duplicated, choose a documented deterministic tie-breaker. Always check how many rows each join produces.",
+          "mentalModel": "CTE = named step; window = per-group metric without changing the row count.",
+          "exercise": "Explain why GROUP BY alone cannot return an entire latest-invoice record without extra logic.",
+          "pitfall": "Never use ROW_NUMBER with only a tied timestamp if determinism matters."
         },
         {
           "title": "Vectorization and boundaries",
-          "body": "In Pandas, operate on columns where possible; validate input schemas and explicitly handle errors at system boundaries."
+          "body": "In Pandas, operate on columns where possible; validate input schemas and explicitly handle errors at system boundaries.",
+          "deep": "Pandas vectorization means operating on whole columns using functions such as `to_numeric`, `fillna`, `groupby`, boolean masks and string methods, rather than Python loops over rows. This reduces interpreter overhead and gives clearer operation-level intent. However, vectorization does not fix bad business rules: a blank amount may mean unknown, not zero.\n\nUse dataclasses for small structured internal domain objects and explicit validation to fail early. Separate parsing from business rules. Catch narrow expected exceptions (`TypeError`, `ValueError`), attach actionable error messages, and re-raise when unknown failures must surface.",
+          "mentalModel": "Raw column → typed column → valid mask → grouped summary.",
+          "exercise": "Explain why a missing invoice amount cannot always be replaced with 0.",
+          "pitfall": "Do not silently coerce invalid amounts to a plausible business value."
         }
       ],
       "diagram": [
@@ -305,9 +349,9 @@
           ],
           "reference": {
             "language": "python",
-            "code": "import sqlite3\ncon = sqlite3.connect(\":memory:\")\ncon.executescript(\"\"\"\nCREATE TABLE invoices(customer TEXT, invoice_id INT, amount INT);\nINSERT INTO invoices VALUES ('A', 1, 50), ('A', 2, 70), ('B', 3, 20);\n\"\"\")\nrows = con.execute(\"\"\"\nWITH ranked AS (\n SELECT customer, invoice_id, amount,\n ROW_NUMBER() OVER (PARTITION BY customer ORDER BY invoice_id DESC) AS rn\n FROM invoices\n) SELECT customer, amount FROM ranked WHERE rn=1 ORDER BY customer\n\"\"\").fetchall()\nprint(rows)",
-            "expected": "[('A', 70), ('B', 20)]",
-            "run": "python sql_drill.py"
+            "code": "import sqlite3\ncon = sqlite3.connect(':memory:')\ncon.executescript('''\nCREATE TABLE customers(id TEXT PRIMARY KEY);\nCREATE TABLE invoices(id INTEGER PRIMARY KEY, customer_id TEXT,\n  invoice_date TEXT, amount INTEGER, is_paid INT, overdue INT);\nINSERT INTO customers VALUES ('A'),('B'),('C');\nINSERT INTO invoices VALUES\n (1,'A','2026-01-02',50,0,1), (2,'A','2026-01-03',70,1,0),\n (3,'B','2026-01-03',20,0,1);\n''')\nrows = con.execute('''\nWITH latest AS (\n SELECT customer_id, id,\n ROW_NUMBER() OVER(PARTITION BY customer_id\n  ORDER BY invoice_date DESC, id DESC) AS rn FROM invoices\n), unpaid AS (\n SELECT customer_id, SUM(amount) total FROM invoices\n WHERE is_paid=0 AND overdue=1 GROUP BY customer_id\n)\nSELECT c.id, l.id, COALESCE(u.total,0)\nFROM customers c\nLEFT JOIN latest l ON c.id=l.customer_id AND l.rn=1\nLEFT JOIN unpaid u ON c.id=u.customer_id\nORDER BY c.id\n''').fetchall()\nprint(rows)\n",
+            "run": "python sql_drill.py",
+            "expected": "[('A', 2, 50), ('B', 3, 20), ('C', None, 0)]"
           },
           "checks": [
             "Customer with no invoices",
@@ -326,7 +370,12 @@
             "Try pd.to_numeric(errors=\"coerce\"), boolean masks, and groupby.",
             "Pseudocode: coerce amount to number; count failed parses; filter amount >= 0; groupby customer and sum; assert totals."
           ],
-          "reference": null,
+          "reference": {
+            "language": "python",
+            "code": "import pandas as pd\nraw = pd.DataFrame({\n    'invoice_id':[1,2,2,3,4], 'customer_id':['A','A','A','B','B'],\n    'amount':['100','oops','oops','-5','20'],\n    'invoice_date':['2026-01-01']*5, 'paid':[False]*5\n})\nraw['amount'] = pd.to_numeric(raw['amount'], errors='coerce')\nvalid = raw.drop_duplicates('invoice_id').loc[lambda d: d['amount'].notna() & d['amount'].ge(0)]\nprint(valid.groupby('customer_id')['amount'].sum().to_dict())\nprint(f'valid={len(valid)}, rejected={len(raw)-len(valid)}')\n",
+            "run": "python -m pip install pandas && python clean_invoices.py",
+            "expected": "{'A': 100.0, 'B': 20.0}; valid=2, rejected=3"
+          },
           "checks": [
             "No Python for-loop across DataFrame rows",
             "Log rejected records count",
@@ -344,7 +393,12 @@
             "Explicitly distinguish missing fields from invalid formats.",
             "Pseudocode: read fields; validate required keys; convert amount; reject negative; construct immutable record; raise targeted exceptions."
           ],
-          "reference": null,
+          "reference": {
+            "language": "python",
+            "code": "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass Invoice:\n    invoice_id: str\n    amount: float\n\ndef parse_invoice(record: dict) -> Invoice:\n    try:\n        amount = float(record['amount'])\n    except (KeyError, TypeError, ValueError) as err:\n        raise ValueError('amount must be a number') from err\n    if amount < 0:\n        raise ValueError('amount cannot be negative')\n    return Invoice(str(record['invoice_id']), amount)\n\nassert parse_invoice({'invoice_id':1,'amount':'8'}).amount == 8\ntry:\n    parse_invoice({'invoice_id':2,'amount':'oops'})\nexcept ValueError as err:\n    print(str(err))\n",
+            "run": "python invoice_domain.py",
+            "expected": "amount must be a number"
+          },
           "checks": [
             "Readable error message",
             "Unit tests check error types",
@@ -473,15 +527,27 @@
       "concepts": [
         {
           "title": "HTTP contracts",
-          "body": "A request has method, path, headers and body. Your API should validate untrusted input, return understandable errors, and respond predictably."
+          "body": "A request has method, path, headers and body. Your API should validate untrusted input, return understandable errors, and respond predictably.",
+          "deep": "HTTP methods define how a client communicates intent: GET retrieves state; POST submits new data. Status codes communicate outcomes: 200 for success, 422 for schema validation failures in FastAPI, and 500 for unexpected server bugs. Your response contract must be explicit about field types, allowed values and errors.\n\nWrite the pure scoring rule separately from the route. That gives you fast unit tests without booting a server, and a clean way to replace the rule with an ML model later. A deterministic rule is not a machine-learning system; label it accurately in the response.",
+          "mentalModel": "JSON request → validation → pure function → JSON response / typed error.",
+          "exercise": "Predict the response for a missing required field and a negative amount.",
+          "pitfall": "An HTTP 200 with `{\"error\":\"invalid\"}` masks failures from monitoring."
         },
         {
           "title": "Pydantic + FastAPI",
-          "body": "Pydantic validates typed request models at runtime. FastAPI uses these types to generate OpenAPI documentation. Validation is not authentication."
+          "body": "Pydantic validates typed request models at runtime. FastAPI uses these types to generate OpenAPI documentation. Validation is not authentication.",
+          "deep": "Pydantic models describe untrusted request data. Use `Field(ge=0)` to reject negatives at the boundary, and choose strictness deliberately: implicit conversion can be useful for forms but surprising for APIs. FastAPI automatically exposes OpenAPI documentation so clients can inspect contracts.\n\nUse `fastapi.testclient.TestClient` to exercise your routes. Check both body and status; a passing success test does not prove invalid inputs are handled. Pin dependency versions after checking them rather than copying stale pins from a tutorial.",
+          "mentalModel": "The schema is executable documentation and the first security boundary.",
+          "exercise": "Write one test asserting invalid amount receives status 422, not 500.",
+          "pitfall": "Validation does not replace authorization, input size limits, or secret management."
         },
         {
           "title": "Container boundaries",
-          "body": "Docker packages your application and dependencies. It does not automatically secure your API or guarantee observability."
+          "body": "Docker packages your application and dependencies. It does not automatically secure your API or guarantee observability.",
+          "deep": "A container packages the application with a known runtime, dependencies and startup command. It does not magically make your API secure or fault tolerant. The Docker build context is everything `docker build` can see, so `.dockerignore` is critical: exclude `.env`, `.git` and local caches.\n\nUse one service, port 8000 and a `/health` endpoint. Verify that the request reaches the container rather than the old local process. When comparing Docker vs Podman, the goal is understanding image, container, port mapping and environment boundaries, not learning every command.",
+          "mentalModel": "Source + dependencies → image → isolated process → mapped HTTP port.",
+          "exercise": "Explain the difference between EXPOSE 8000 and docker run -p 8000:8000.",
+          "pitfall": "Do not COPY . into the image before defining a `.dockerignore`."
         }
       ],
       "diagram": [
@@ -504,9 +570,9 @@
           ],
           "reference": {
             "language": "python",
-            "code": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\nclass Invoice(BaseModel):\n    amount: float = Field(ge=0)\n    days_overdue: int = Field(ge=0)\n\n@app.get(\"/health\")\ndef health():\n    return {\"status\": \"ok\"}\n\n@app.post(\"/score\")\ndef score(invoice: Invoice):\n    return {\"risk_flag\": invoice.days_overdue >= 30, \"kind\": \"rule_only\"}",
-            "expected": "After `uvicorn main:app --reload`, GET /health returns {\"status\":\"ok\"}; POST /score with {\"amount\":200,\"days_overdue\":45} returns {\"risk_flag\":true,\"kind\":\"rule_only\"}.",
-            "run": "pip install fastapi uvicorn && uvicorn main:app --reload"
+            "code": "from fastapi import FastAPI\nfrom pydantic import BaseModel, Field\n\napp = FastAPI()\n\nclass Invoice(BaseModel):\n    amount: float = Field(ge=0)\n    days_overdue: int = Field(ge=0)\n\n\ndef risk_rule(days_overdue: int) -> bool:\n    return days_overdue >= 30\n\n@app.get('/health')\ndef health():\n    return {'status': 'ok'}\n\n@app.post('/score')\ndef score(invoice: Invoice):\n    return {'risk_flag': risk_rule(invoice.days_overdue), 'kind': 'rule_only'}\n",
+            "run": "python -m pip install fastapi uvicorn && uvicorn main:app --port 8000; then curl http://127.0.0.1:8000/health",
+            "expected": "GET /health → {\"status\":\"ok\"}; POST /score with {\"amount\":200,\"days_overdue\":45} → {\"risk_flag\":true,\"kind\":\"rule_only\"}"
           },
           "checks": [
             "Reject negative values",
@@ -525,7 +591,12 @@
             "Use fastapi.testclient.TestClient; httpx is required by TestClient and must be installed.",
             "Pseudocode: create client; call routes; assert expected status and response; send invalid input and assert validation error."
           ],
-          "reference": null,
+          "reference": {
+            "language": "python",
+            "code": "from fastapi.testclient import TestClient\nfrom main import app\n\nclient = TestClient(app)\n\ndef test_health():\n    r = client.get('/health')\n    assert r.status_code == 200 and r.json() == {'status': 'ok'}\n\ndef test_score():\n    r = client.post('/score', json={'amount': 200, 'days_overdue': 45})\n    assert r.status_code == 200 and r.json()['risk_flag'] is True\n\ndef test_invalid():\n    r = client.post('/score', json={'amount': -1, 'days_overdue': 45})\n    assert r.status_code == 422\n",
+            "run": "Save as test_main.py next to main.py from Lab 1; python -m pip install pytest httpx fastapi && python -m pytest -q test_main.py",
+            "expected": "3 passed (test duration varies)"
+          },
           "checks": [
             "2xx for valid input",
             "4xx for invalid data",
@@ -543,7 +614,12 @@
             "Use python:3.12-slim, WORKDIR, COPY requirements, pip install, COPY app, and CMD uvicorn.",
             "Pseudocode: build image; run with port mapping; GET /health; inspect logs; stop container."
           ],
-          "reference": null,
+          "reference": {
+            "language": "dockerfile",
+            "code": "FROM python:3.12-slim\nWORKDIR /app\nRUN pip install --no-cache-dir fastapi uvicorn\nCOPY main.py /app/main.py\nEXPOSE 8000\nCMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n",
+            "run": "Save as Dockerfile next to main.py; write .dockerignore containing .env and .git; run docker build -t aae-api . && docker run --rm -p 8000:8000 aae-api; in another terminal curl http://localhost:8000/health",
+            "expected": "HTTP 200 {\"status\":\"ok\"} after server starts; pin dependencies after checking actual versions"
+          },
           "checks": [
             "Avoid baking API keys",
             "Use .dockerignore",
@@ -630,404 +706,6 @@
         "Commit FastAPI app, tests and Dockerfile.",
         "Record actual curl samples and container run result.",
         "Draft bullet: Built a containerized FastAPI service with X tested endpoints (replace X after your run)."
-      ]
-    },
-    {
-      "agenda": [
-        {
-          "time": "0:00–1:00",
-          "label": "LEARN",
-          "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
-        },
-        {
-          "time": "1:00–4:30",
-          "label": "BUILD",
-          "detail": "Write the core logic yourself, using the four-level hint ladder."
-        },
-        {
-          "time": "4:30–5:00",
-          "label": "BREAK IT",
-          "detail": "Deliberately reproduce one failure and document the fix."
-        },
-        {
-          "time": "5:00–5:30",
-          "label": "REVIEW",
-          "detail": "Five-question quiz, cheat sheet, and three interview questions."
-        },
-        {
-          "time": "5:30–6:00",
-          "label": "SHIP",
-          "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
-        }
-      ],
-      "day": 4,
-      "title": "Databricks & Spark",
-      "tagline": "Think in distributed dataframes, even with tiny data.",
-      "outcome": "A working PySpark data transformation, an explained execution plan, and an agreed Project 1 business problem.",
-      "tier": {
-        "name": "Databricks Free Edition serverless compute",
-        "status": "Free Edition has fair-use quotas, only serverless compute, and no reliability SLA. Workspace quotas vary; do not assume unlimited hours. Local PySpark is a free fallback. No GPU is needed.",
-        "url": "https://docs.databricks.com/aws/en/getting-started/free-edition-limitations"
-      },
-      "concepts": [
-        {
-          "title": "Why Spark exists",
-          "body": "Spark distributes operations over partitions. Your code describes a transformation graph; Spark can wait until an action like count() triggers work."
-        },
-        {
-          "title": "Transformations vs actions",
-          "body": "select, filter, join and groupBy describe changes. count, collect and show cause computation. Avoid collect on large datasets."
-        },
-        {
-          "title": "Free Edition reality",
-          "body": "Use a small dataset. Spark is valuable for learning scalable patterns, but Pandas is often simpler and cheaper for data that fits memory."
-        }
-      ],
-      "diagram": [
-        "Source rows",
-        "Spark transformations (lazy)",
-        "Execution plan",
-        "Action → results"
-      ],
-      "tasks": [
-        {
-          "id": "d4a",
-          "title": "Run your first Spark DataFrame • 65 min",
-          "minutes": 65,
-          "brief": "In Databricks, create an in-memory toy payments table and compute total amount by customer. Inspect the result and explain what triggered execution.",
-          "deliverable": "Notebook with actual outputs and your explanation of lazy execution.",
-          "hints": [
-            "Create a DataFrame with customer_id and amount using spark.createDataFrame.",
-            "Try groupBy(...).sum(...), then orderBy(...), then show().",
-            "Pseudocode: create rows; transform with groupBy; aggregate sum; run action; verify hand-calculated totals."
-          ],
-          "reference": {
-            "language": "python",
-            "code": "# Run in a Databricks Python notebook where `spark` exists.\nrows = [(\"A\", 50), (\"A\", 70), (\"B\", 20)]\ndf = spark.createDataFrame(rows, [\"customer\", \"amount\"])\nresult = df.groupBy(\"customer\").sum(\"amount\").orderBy(\"customer\")\nprint([(r[\"customer\"], r[\"sum(amount)\"]) for r in result.collect()])",
-            "expected": "[('A', 120), ('B', 20)]",
-            "run": "Databricks Python notebook with an active Free Edition serverless session"
-          },
-          "checks": [
-            "Spark action identified",
-            "Correct totals",
-            "No collect on a large real dataset"
-          ]
-        },
-        {
-          "id": "d4b",
-          "title": "Join and inspect a query plan • 75 min",
-          "minutes": 75,
-          "brief": "Create a separate customer table (including a customer with no payments), LEFT JOIN to the payments, and compare physical/optimized plans with a simple join. Watch for duplicate rows.",
-          "deliverable": "Screenshot or text of explain() and a short join-grain note.",
-          "hints": [
-            "Think: What is one row of each table?",
-            "Use DataFrame.join(..., \"left\") and explain() to inspect the plan.",
-            "Pseudocode: create customer table; left join; count rows and customer ids; compare plan; explain potential shuffle."
-          ],
-          "reference": null,
-          "checks": [
-            "Row counts checked",
-            "Missing customers handled",
-            "Join cardinality understood"
-          ]
-        },
-        {
-          "id": "d4c",
-          "title": "Scope Project 1 • 70 min",
-          "minutes": 70,
-          "brief": "Choose an openly licensed business dataset suitable for predicting payment delays or late-payment likelihood. Inspect its actual licence, timestamp fields, label, and leakage risks. If licence or data is unclear, create a labeled synthetic sample ONLY for pipeline development and defer model claims.",
-          "deliverable": "A problem.md with user, decision, label, prediction time, metric and leakage checklist.",
-          "hints": [
-            "A business problem needs a user and a decision, not just a Kaggle CSV.",
-            "Prefer a target available after prediction time and features available before it. Verify licence at source.",
-            "Pseudocode: define business action → prediction event → allowed features → baseline → holdout → acceptance metric."
-          ],
-          "reference": null,
-          "checks": [
-            "No invented dataset licence",
-            "Success metric grounded in business costs",
-            "Prediction timestamp defined"
-          ]
-        }
-      ],
-      "break": {
-        "title": "The accidental collect()",
-        "challenge": "Explain why df.collect() on millions of rows can crash a small driver. Rework your notebook to use show(10), limit, or aggregate first. Do not intentionally overload the free compute quota.",
-        "diagnose": "Record where work happens: Spark executors vs Python driver."
-      },
-      "quiz": [
-        {
-          "question": "Spark select and filter are generally…",
-          "choices": [
-            "Actions",
-            "Lazy transformations",
-            "Always database writes",
-            "GPU operations"
-          ],
-          "answer": 1,
-          "explanation": "Transformations build a plan; actions start execution."
-        },
-        {
-          "question": "Which can pull an entire dataset to the driver?",
-          "choices": [
-            "filter",
-            "select",
-            "collect",
-            "withColumn"
-          ],
-          "answer": 2,
-          "explanation": "collect() transfers all returned rows to the driver."
-        },
-        {
-          "question": "Why inspect JOIN cardinality?",
-          "choices": [
-            "To pick font sizes",
-            "To avoid accidental row multiplication",
-            "To encrypt data",
-            "To skip testing"
-          ],
-          "answer": 1,
-          "explanation": "Wrong join grain can silently duplicate data."
-        },
-        {
-          "question": "When would you NOT use Spark?",
-          "choices": [
-            "Small in-memory dataset with simple operations",
-            "Wide distributed dataset",
-            "Large-scale aggregation",
-            "Distributed ETL"
-          ],
-          "answer": 0,
-          "explanation": "Pandas/SQL may be simpler for modest workloads."
-        },
-        {
-          "question": "A dataset without a verified licence should be…",
-          "choices": [
-            "Used publicly regardless",
-            "Treated as unknown until verified",
-            "Assumed MIT",
-            "Uploaded to GitHub"
-          ],
-          "answer": 1,
-          "explanation": "Validate reuse and redistribution rights before publishing data."
-        }
-      ],
-      "cheatsheet": [
-        "DataFrames are lazy transformation plans.",
-        "Actions include count/show/collect.",
-        "Avoid collecting large data to the driver.",
-        "Join grain must be explicitly checked.",
-        "Free Edition can have quota shutdowns.",
-        "Define a timestamp-aware prediction problem before modeling."
-      ],
-      "interview": [
-        "Explain lazy execution in Spark to a junior engineer.",
-        "How do you choose between Pandas, SQL and Spark for a customer pipeline?",
-        "What questions would you ask a customer before building payment-delay prediction?"
-      ],
-      "ship": [
-        "Commit Spark notebook or scripts, not credentials.",
-        "Add the real explain() output and dataset licence evidence.",
-        "Draft bullet: Built an initial PySpark transformation over X records with validated totals (measure X)."
-      ]
-    },
-    {
-      "agenda": [
-        {
-          "time": "0:00–1:00",
-          "label": "LEARN",
-          "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
-        },
-        {
-          "time": "1:00–4:30",
-          "label": "BUILD",
-          "detail": "Write the core logic yourself, using the four-level hint ladder."
-        },
-        {
-          "time": "4:30–5:00",
-          "label": "BREAK IT",
-          "detail": "Deliberately reproduce one failure and document the fix."
-        },
-        {
-          "time": "5:00–5:30",
-          "label": "REVIEW",
-          "detail": "Five-question quiz, cheat sheet, and three interview questions."
-        },
-        {
-          "time": "5:30–6:00",
-          "label": "SHIP",
-          "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
-        }
-      ],
-      "day": 5,
-      "title": "Delta, quality & medallion",
-      "tagline": "Build data you can trust before building a model.",
-      "outcome": "A small bronze/silver/gold pipeline with explicit data-quality tests and repeatable evidence.",
-      "tier": {
-        "name": "Databricks Free Edition + Delta tables",
-        "status": "Free Edition compute is quota-bound; availability of Unity Catalog permissions and specific workspace features must be checked in your account. Local Python/Parquet can teach the cleaning pattern if Delta features are unavailable.",
-        "url": "https://docs.databricks.com/aws/en/getting-started/free-edition-limitations"
-      },
-      "concepts": [
-        {
-          "title": "Bronze, silver, gold are conventions",
-          "body": "Bronze: preserve raw source with provenance. Silver: clean, type and de-duplicate. Gold: business-ready aggregates or model features. These are architecture labels, not built-in Spark classes."
-        },
-        {
-          "title": "Delta Lake and transactional data",
-          "body": "Delta Lake adds a transaction log and table operations on top of files. Avoid promising every enterprise feature is enabled in Free Edition."
-        },
-        {
-          "title": "Data quality as code",
-          "body": "Define checks for null keys, duplicate business IDs, valid ranges, and plausible dates. Decide whether to reject, quarantine or repair bad records; never silently discard without evidence."
-        }
-      ],
-      "diagram": [
-        "Bronze: raw + origin",
-        "Silver: typed + deduped",
-        "Quality gates",
-        "Gold: usable features"
-      ],
-      "tasks": [
-        {
-          "id": "d5a",
-          "title": "Ingest a reproducible bronze table • 60 min",
-          "minutes": 60,
-          "brief": "Read a small CSV of invoices (or the vetted dataset from Day 4) into a named bronze table or DataFrame. Include source_file and ingestion_time. Show total row count and raw null counts. Do not overwrite your raw copy.",
-          "deliverable": "Notebook output, row counts and provenance fields.",
-          "hints": [
-            "Raw means recoverable, not cleaned in place.",
-            "Use explicit column names; include a reproducible source reference.",
-            "Pseudocode: read source; add ingestion metadata; write raw table; count rows; log source version."
-          ],
-          "reference": null,
-          "checks": [
-            "Keep raw copy",
-            "Row count recorded",
-            "Source and licence documented"
-          ]
-        },
-        {
-          "id": "d5b",
-          "title": "Silver transforms with quality gates • 95 min",
-          "minutes": 95,
-          "brief": "Normalize types, deduplicate on invoice_id with a documented rule, reject negative amounts, and count bad records. Prove that repeated ingestion does not multiply rows.",
-          "deliverable": "Silver table, quality_checks.py, observed pass/fail counts.",
-          "hints": [
-            "Write quality rules before changing records.",
-            "Check null IDs and amounts, duplicate IDs, date ordering, and permitted values.",
-            "Pseudocode: load bronze; validate fields; split valid/quarantine; resolve duplicates by timestamp; assert unique keys; save silver."
-          ],
-          "reference": {
-            "language": "python",
-            "code": "rows = [\n {\"invoice_id\":\"1\", \"amount\":100},\n {\"invoice_id\":\"1\", \"amount\":100},\n {\"invoice_id\":\"2\", \"amount\":-8},\n {\"invoice_id\":\"3\", \"amount\":25},\n]\nseen, good, rejected = set(), [], 0\nfor row in rows:\n    if row[\"amount\"] < 0 or row[\"invoice_id\"] in seen:\n        rejected += 1\n        continue\n    seen.add(row[\"invoice_id\"])\n    good.append(row)\nprint(len(good), rejected)",
-            "expected": "2 2",
-            "run": "python quality_gate.py"
-          },
-          "checks": [
-            "Invalid records counted",
-            "Business key is unique",
-            "Repeated input does not multiply silver rows"
-          ]
-        },
-        {
-          "id": "d5c",
-          "title": "Gold aggregate + repeatable run • 55 min",
-          "minutes": 55,
-          "brief": "Create a gold view with customer-level invoice count, total amount and max overdue days. Document that these are descriptive today: do not leak future labels into later model features. Re-run from raw and compare counts.",
-          "deliverable": "Gold schema and a README table with actual quality metrics.",
-          "hints": [
-            "Gold is tailored for consumers; it is not necessarily a machine-learning feature table yet.",
-            "Use groupBy/SQL GROUP BY with explicit allowed columns; save observed row counts.",
-            "Pseudocode: read silver → group by customer → compute business aggregates → assert row and sum invariants → store gold."
-          ],
-          "reference": null,
-          "checks": [
-            "Counts match after rerun",
-            "No future-only features",
-            "Report failures honestly"
-          ]
-        }
-      ],
-      "break": {
-        "title": "The quiet duplicate",
-        "challenge": "Reingest the same source into your silver step. If your logic simply appends, duplicates appear. Debug and fix using stable business keys and idempotent writes for your chosen environment.",
-        "diagnose": "Compare key uniqueness and counts across two identical runs; record before/after evidence."
-      },
-      "quiz": [
-        {
-          "question": "What should bronze preserve?",
-          "choices": [
-            "Only preprocessed features",
-            "Raw records and provenance",
-            "Only predictions",
-            "Only charts"
-          ],
-          "answer": 1,
-          "explanation": "Bronze stores source data so transformations can be reproduced."
-        },
-        {
-          "question": "What does idempotence mean here?",
-          "choices": [
-            "Every rerun doubles rows",
-            "Repeated identical runs yield the same state",
-            "No logs are kept",
-            "All tables are cached"
-          ],
-          "answer": 1,
-          "explanation": "Idempotent pipelines can be safely rerun."
-        },
-        {
-          "question": "A null primary business key should usually be…",
-          "choices": [
-            "Ignored silently",
-            "Explicitly rejected/quarantined or handled under a rule",
-            "Used as a model feature",
-            "Automatically replaced by 0"
-          ],
-          "answer": 1,
-          "explanation": "Null identifiers can break deduplication and joins."
-        },
-        {
-          "question": "Does MLflow automatically calculate PSI drift?",
-          "choices": [
-            "Yes",
-            "No",
-            "Only with Docker",
-            "Only for SQL"
-          ],
-          "answer": 1,
-          "explanation": "You must implement or integrate drift checks; MLflow tracking alone does not detect drift."
-        },
-        {
-          "question": "Gold should be designed around…",
-          "choices": [
-            "A real data consumer",
-            "The largest table",
-            "The prettiest dashboard",
-            "Random feature count"
-          ],
-          "answer": 0,
-          "explanation": "Gold tables represent curated business needs or downstream features."
-        }
-      ],
-      "cheatsheet": [
-        "Bronze raw; silver validated; gold consumer-ready.",
-        "Document source, licence, provenance and ingestion time.",
-        "Define data-quality checks before cleaning.",
-        "Quarantine or count bad records; do not hide them.",
-        "Idempotence avoids duplicate accumulation on reruns.",
-        "Quality metrics need observed counts, not invented percentages."
-      ],
-      "interview": [
-        "Design a bronze/silver/gold pipeline for messy vendor invoices.",
-        "How do you deal with a source that republishes the same records every day?",
-        "What data-quality tests would prevent silent corruption before model training?"
-      ],
-      "ship": [
-        "Commit pipeline source, tests and a measured quality report.",
-        "README includes actual source licence and row-count table.",
-        "Draft bullet: Built a bronze/silver/gold pipeline with X automated quality checks and repeatable reruns (measure X)."
       ]
     }
   ]

@@ -11,3 +11,7 @@ __pycache__/
 .venv/
 .idea/
 .vscode/
+# Cloudflare Worker local configuration and secrets
+worker/wrangler.toml
+worker/.dev.vars
+worker/.wrangler/

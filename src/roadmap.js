@@ -1,6 +1,6 @@
 export const START_DATE = '2026-11-06';
 export const BASE_PATH = '/applied-ai-engineer/';
-export const RELEASE_DATES = ['2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09'];
+export const RELEASE_DATES = ['2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12'];
 export const phases = [
  {key:'foundations', label:'01 / Foundations', description:'Only fill the gaps', range:'Days 01–03'},
  {key:'pipeline', label:'02 / Data + ML Pipeline', description:'Project 1: production-style scoring API', range:'Days 04–09'},
@@ -17,7 +17,7 @@ export const roadmap = [
  [16,'Public demo + measurement','assistant'],[17,'QLoRA + baseline','finetune'],[18,'Fine-tune & compare','finetune'],
  [19,'FDE customer simulation','hiring'],[20,'Mock interview + career kit','hiring']
 ].map(([day,title,phase])=>({day,title,phase}));
-export function releaseDateFor(day){const batch=Math.floor((day-1)/5); return RELEASE_DATES[batch]||null;}
+export function releaseDateFor(day){const batch=Math.floor((day-1)/3); return RELEASE_DATES[batch]||null;}
 export function currentISTDate(date=new Date()){
  const parts = new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
  const get=(k)=>parts.find(p=>p.type===k)?.value;

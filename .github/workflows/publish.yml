@@ -1,4 +1,4 @@
-name: Validate and release bootcamp lessons
+name: Validate and release reviewed learning missions
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: bootcamp-content-release
+  group: learning-content-release
   cancel-in-progress: false
 
 permissions:
@@ -19,35 +19,35 @@ jobs:
   validate-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout site
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
           persist-credentials: true
-      - name: Set up Node.js
+      - name: Use Node 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate lesson content and release logic
+      - name: Test source and editorial content
         run: npm test
-      - name: Publish scheduled reviewed batch
+      - name: Release up to three reviewed lessons for today's IST date
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: npm run release
-      - name: Validate published content
+      - name: Test and build public-only static files
         run: |
           npm test
           npm run build
-      - name: Commit released lessons to GitHub
+      - name: Commit released mission files
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add content/live/
           if ! git diff --cached --quiet; then
-            git commit -m "content: publish prepared lessons for today (IST)"
+            git commit -m "content: release reviewed mission batch at midnight IST"
             git push
           else
-            echo "No new reviewed lessons to commit."
+            echo "No new reviewed missions were published."
           fi
 
-# Vercel deploys from main via its Git integration.
-# Do not also configure Vercel Cron: GitHub Actions owns the content release schedule.
+# Cloudflare Pages Git integration deploys the linked repository's production branch.
+# Verify the bot-originated scheduled release appears in Pages build history.
