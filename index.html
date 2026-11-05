@@ -2,17 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#101c24" />
-  <meta name="description" content="An interactive, free-first 20-day Applied AI Engineer bootcamp. Build real projects, write your own code, measure what matters." />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Applied AI Engineer — a free 20-day hands-on AI engineering field academy. Learn, build and ship real projects." />
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="./assets/styles.css" />
   <link rel="stylesheet" href="./assets/galaxy.css" />
-  <title>Applied AI Engineer — 20-Day Sprint</title>
+  <link rel="stylesheet" href="./assets/landing.css" />
+  <title>Applied AI Engineer — Build what matters</title>
 </head>
-<body>
+<body class="landing-mode">
+  <div id="landing" class="orbit-landing" aria-label="Applied AI Engineer introduction">
+    <video class="landing-sky" aria-hidden="true" autoplay muted loop playsinline preload="metadata" poster="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/0bf7409c-9fa2-4bef-a49d-34903dcc91ad.png" src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/4b73c700-3112-4c07-bd48-0af2893dff7c.mp4"></video>
+    <div class="landing-veil" aria-hidden="true"></div>
+    <header class="landing-bar">
+      <a class="landing-brand" href="#/" aria-label="Applied AI Engineer home">
+        <svg viewBox="0 0 26.9 16.6" width="27" height="17" fill="none" aria-hidden="true"><ellipse cx="13.25" cy="8.4" rx="13.2" ry="2.9" transform="rotate(-25 13.25 8.4)" stroke="currentColor" stroke-width="1.25"/><circle cx="13.25" cy="8.4" r="8.8" fill="#000"/><circle cx="13.25" cy="8.4" r="8.1" fill="currentColor"/><ellipse cx="13.25" cy="8.4" rx="13.2" ry="2.9" transform="rotate(-25 13.25 8.4)" stroke="#000" stroke-width=".9" stroke-dasharray="28.2 28.2"/><ellipse cx="13.25" cy="8.4" rx="13.2" ry="2.9" transform="rotate(-25 13.25 8.4)" stroke="currentColor" stroke-width="1.25" stroke-dasharray="28.2 28.2"/></svg>
+        <span>Applied AI Engineer</span>
+      </a>
+      <nav class="landing-links" aria-label="Explore academy">
+        <a href="#/curriculum">Curriculum</a><a href="#/projects">Projects</a><a href="#/progress">Progress</a>
+      </nav>
+      <div class="landing-actions"><a class="landing-btn landing-outline" href="#/curriculum">Explore missions</a><a class="landing-btn landing-solid" href="#/home">Enter academy</a></div>
+      <button class="landing-menu-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="landing-menu"><svg viewBox="0 0 20 14" width="20" height="14" aria-hidden="true"><path d="M0 1h20M0 7h20M0 13h20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <nav class="landing-menu" id="landing-menu" aria-label="Mobile academy navigation"><a href="#/home">Enter academy</a><a href="#/curriculum">Curriculum</a><a href="#/projects">Projects</a><a href="#/progress">Progress</a></nav>
+    </header>
+    <main class="landing-screen">
+      <a class="landing-pill" href="#/curriculum"><span>Free</span>20 days. Real-world AI engineering.<span aria-hidden="true">↗</span></a>
+      <h1><span class="landing-line"><span>Learn beyond theory.</span></span><span class="landing-line"><span>Build what matters.</span></span></h1>
+      <p>Twenty days of hands-on missions, real projects and measurable progress. From first principles to production-ready AI.</p>
+      <div class="landing-cta"><a class="landing-btn landing-outline" href="#/curriculum">View roadmap</a><a class="landing-btn landing-solid" href="#/home">Start learning</a></div>
+    </main>
+    <footer class="landing-credit"><a href="https://ishuu.me" target="_blank" rel="noopener noreferrer">Made by I⚡️H</a></footer>
+  </div>
   <div id="app"><div class="boot-loading">Loading your learning workspace…</div></div>
   <noscript>This learning workspace needs JavaScript. Enable JavaScript and reload.</noscript>
   <script type="module" src="./src/app.js"></script>
+  <script>
+    (() => {
+      const landing=document.getElementById('landing');
+      const video=landing.querySelector('video');
+      const button=landing.querySelector('.landing-menu-button');
+      const menu=landing.querySelector('.landing-menu');
+      const setMenu=open=>{menu.classList.toggle('open',open);button.setAttribute('aria-expanded',String(open));button.setAttribute('aria-label',open?'Close menu':'Menu');};
+      button.addEventListener('click',e=>{e.stopPropagation();setMenu(!menu.classList.contains('open'));});
+      document.addEventListener('click',e=>{if(!e.target.closest('.landing-bar'))setMenu(false);});
+      document.addEventListener('keydown',e=>{if(e.key==='Escape')setMenu(false);});
+      menu.addEventListener('click',e=>{if(e.target.closest('a'))setMenu(false);});
+      const play=()=>{if(!video.paused)return;const result=video.play();if(result?.catch)result.catch(()=>{});};
+      play();video.addEventListener('canplay',play);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.classList.contains('landing-mode'))play();});
+      document.addEventListener('pointerdown',play,{once:true,passive:true});
+      window.addEventListener('hashchange',()=>{if(location.hash&&location.hash!=='#/'&&location.hash!=='#'){video.pause();}else play();});
+    })();
+  </script>
 </body>
 </html>
