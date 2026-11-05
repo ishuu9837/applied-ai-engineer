@@ -59,7 +59,8 @@ async function initAuth(){
 async function submitAuth(event){
  event.preventDefault();const form=event.target;const mode=form.dataset.mode,data=new FormData(form);
  const email=String(data.get('email')||'').trim().toLowerCase(),password=String(data.get('password')||''),name=String(data.get('name')||'').trim();
- if(mode==='signup'&&!(/.{8,}/s.test(password)&&/[A-Z]/.test(password)&&/[a-z]/.test(password)&&/[0-9]/.test(password)&&/[^A-Za-z0-9\s]/.test(password))){authNotice='Password needs at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character.';render();return;}\n if(mode==='signup'&&password!==String(data.get('confirm')||'')){authNotice='Passwords do not match';render();return;}
+ if(mode==='signup'&&!(/.{8,}/s.test(password)&&/[A-Z]/.test(password)&&/[a-z]/.test(password)&&/[0-9]/.test(password)&&/[^A-Za-z0-9\s]/.test(password))){authNotice='Password needs at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character.';render();return;}
+ if(mode==='signup'&&password!==String(data.get('confirm')||'')){authNotice='Passwords do not match';render();return;}
  const button=form.querySelector('button[type=submit]');if(button)button.disabled=true;
  try{const r=await fetch('/api/auth/'+mode,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({email,password,name})});
  const payload=await r.json();if(!r.ok)throw Error(payload.error||'HTTP '+r.status);
