@@ -217,5 +217,44 @@
     "Commit SQL and Python drills with fixtures and tests.",
     "Record the actual query outputs and failures fixed.",
     "Draft bullet: Created tested SQL/Pandas transformations with X quality assertions (only once measured)."
+  ],
+  "learningPath": [
+    {
+      "title": "SQL's execution model",
+      "explanation": "Understand FROM/JOIN, WHERE, GROUP BY, HAVING, SELECT and ORDER BY as a logical evaluation sequence. Filtering before grouping changes the rows that contribute to an aggregate; filtering after grouping changes which aggregate groups survive.",
+      "example": "Example: WHERE amount > 0 excludes refunds before SUM; HAVING SUM(amount) > 0 filters customers after totals are calculated. These answer different questions."
+    },
+    {
+      "title": "Data quality across SQL and Python",
+      "explanation": "Treat nulls, duplicate keys, inconsistent types and unexpected dates as explicit decisions. A LEFT JOIN can multiply rows when the right table contains duplicate keys; COUNT(*) and COUNT(column) treat nulls differently.",
+      "example": "Before joining, check uniqueness of keys and compare row counts. In Python, convert types deliberately and inspect failed conversions rather than silently dropping data."
+    },
+    {
+      "title": "Performance and correctness",
+      "explanation": "Use small fixtures with known answers before optimizing. Choose only required columns, filter early when semantics permit, and inspect query plans on real datasets. Vectorization is not a substitute for correct business logic.",
+      "example": "For a customer summary, manually compute a 5-row example. Then assert the SQL result matches a Python reference aggregation, including null and duplicate cases."
+    }
+  ],
+  "buildPlan": [
+    {
+      "step": 1,
+      "title": "Define the data",
+      "detail": "Document each column's type, whether it may be null, and the primary key. Create a tiny fixture with a duplicate, a null and an outlier."
+    },
+    {
+      "step": 2,
+      "title": "Write queries",
+      "detail": "Build one query at a time: filtering, joins, aggregation, then ranking. Explain what every clause changes and compare against hand-calculated totals."
+    },
+    {
+      "step": 3,
+      "title": "Cross-check in Python",
+      "detail": "Load or construct equivalent records, compute a reference answer, and compare counts and totals. Explain any discrepancy before proceeding."
+    },
+    {
+      "step": 4,
+      "title": "Package evidence",
+      "detail": "Save runnable SQL/Python files, expected outputs, edge-case tests and a README describing assumptions."
+    }
   ]
 }
