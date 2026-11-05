@@ -259,5 +259,44 @@
     "Git commit: day01: diagnostic and project scaffold",
     "README: show commands, test result and actual gaps",
     "Draft bullet: Built a reproducible Python project with X passing tests and lint checks (replace X after running)."
+  ],
+  "learningPath": [
+    {
+      "title": "Engineering contracts",
+      "explanation": "Define input types, accepted ranges, output shapes and failure behavior before writing a function. For a data-cleaning utility, decide whether whitespace-only strings, booleans, negative values and nulls count as invalid. State each rule explicitly so tests can verify it.",
+      "example": "Example: summarize(['12', None, '-3', 'oops']) → (12, 3) when negatives are invalid. A contract includes the meaning of each number, not just the tuple shape."
+    },
+    {
+      "title": "Reproducibility and project layout",
+      "explanation": "Separate reusable logic from notebooks and interactive scripts. Keep dependencies declared, commands documented, and configuration independent of source code. Run tests from a clean checkout to detect hidden local assumptions.",
+      "example": "Suggested structure: src/diagnostic.py, tests/test_diagnostic.py, README.md and a dependency file if packages are needed. A reproducible command is more valuable than a screenshot of a successful notebook."
+    },
+    {
+      "title": "Tests as executable requirements",
+      "explanation": "Use a normal case, an empty case, a boundary case and a malformed-input case. Assert the exact expected output. A test should fail when the implementation is intentionally broken, otherwise it may not be protecting the behavior you think it is.",
+      "example": "For parsing, test [], ['10','20'], [True, None] and ['-1','bad']. Include an explanation of why each expected result follows from your chosen contract."
+    }
+  ],
+  "buildPlan": [
+    {
+      "step": 1,
+      "title": "Specify",
+      "detail": "Write a one-paragraph input/output contract, list invalid inputs, choose filenames and define the command that will run your code."
+    },
+    {
+      "step": 2,
+      "title": "Implement",
+      "detail": "Write the smallest correct function first; keep parsing, validation and aggregation easy to inspect. Do not copy the reference solution before attempting the task."
+    },
+    {
+      "step": 3,
+      "title": "Test",
+      "detail": "Run all required checks and add at least one adversarial case. Capture the command and output in your README."
+    },
+    {
+      "step": 4,
+      "title": "Deliver",
+      "detail": "Commit the implementation and tests, describe one limitation and record what you would improve next."
+    }
   ]
 }
