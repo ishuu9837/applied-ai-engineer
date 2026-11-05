@@ -4,7 +4,7 @@ An interactive 20-day, 120-hour AI Engineering bootcamp with missions, quizzes, 
 
 ## Open access — no authentication
 
-The website opens directly into the mission dashboard. There are **no login or signup pages**, user accounts, password requirements, sessions, or cloud progress endpoints.
+The website opens to an animated, Orbit-inspired landing page. Select **Start learning** to enter the mission dashboard at `/#/home`. There are **no login or signup pages**, user accounts, password requirements, sessions, or cloud progress endpoints.
 
 Progress, XP, notes and self-checks are stored **only in the current browser's localStorage**. Use **Settings → Export JSON backup** to keep a copy. Clearing browser data or changing devices will not automatically transfer progress.
 
@@ -18,7 +18,7 @@ The legacy authentication and private API routes are disabled and return HTTP 40
 - Build command: `npm run build`
 - Deploy command: `npx wrangler deploy`
 
-The root `wrangler.jsonc` serves built static assets from `dist/` through the Worker. The Worker returns 404 for all `/api/*` routes.
+The root `wrangler.jsonc` serves built static assets from `dist/` through the Worker. This repository targets Cloudflare Workers; obsolete Pages Functions and Vercel configuration have been removed. The Worker returns 404 for all `/api/*` routes.
 
 Live URL: https://applied-ai-engineer.eswaryadav8543.workers.dev
 
