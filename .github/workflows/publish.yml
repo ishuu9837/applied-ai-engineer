@@ -1,4 +1,4 @@
-name: Validate, publish and deploy learning site
+name: Validate and release bootcamp lessons
 
 on:
   push:
@@ -9,20 +9,15 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: learning-site-pages
+  group: bootcamp-content-release
   cancel-in-progress: false
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
-  publish:
+  validate-and-publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout site
         uses: actions/checkout@v4
@@ -32,12 +27,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Publish scheduled batch when prepared
+      - name: Validate lesson content and release logic
+        run: npm test
+      - name: Publish scheduled reviewed batch
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: npm run release
-      - name: Validate lessons and release logic
-        run: npm test
-      - name: Commit newly released lesson data (scheduled/manual runs)
+      - name: Validate published content
+        run: |
+          npm test
+          npm run build
+      - name: Commit released lessons to GitHub
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
@@ -47,16 +46,8 @@ jobs:
             git commit -m "content: publish prepared lessons for today (IST)"
             git push
           else
-            echo "No release files changed."
+            echo "No new reviewed lessons to commit."
           fi
-      - name: Create public-only static build
-        run: npm run build
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload site artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist
-      - name: Deploy site
-        id: deployment
-        uses: actions/deploy-pages@v4
+
+# Vercel deploys from main via its Git integration.
+# Do not also configure Vercel Cron: GitHub Actions owns the content release schedule.
