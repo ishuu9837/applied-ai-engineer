@@ -45,7 +45,7 @@ export async function handleAuth(r,env,path){
   if(path==='/auth/signup'&&r.method==='POST'){
     if(env.SIGNUP_DISABLED==='true')return fail('Registration temporarily closed',403);
     const input=await body(r);
-    if(!input||typeof input.email!=='string'||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)||input.email.length>254||typeof input.name!=='string'||input.name.trim().length<2||input.name.trim().length>64||typeof input.password!=='string'||input.password.length<12||input.password.length>128)return fail('Enter a valid name, email, and password of 12–128 characters.',422);
+    if(!input||typeof input.email!=='string'||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)||input.email.length>254||typeof input.name!=='string'||input.name.trim().length<2||input.name.trim().length>64||typeof input.password!=='string'||input.password.length<8||input.password.length>128||!/\p{Lu}/u.test(input.password)||!/\p{Ll}/u.test(input.password)||!/[0-9]/.test(input.password)||!/[\p{P}\p{S}]/u.test(input.password))return fail('Enter a valid name and email. Password must be 8–128 characters with uppercase, lowercase, a number and a special character.',422);
     if(await limit(env,'sign-ip:'+(r.headers.get('cf-connecting-ip')||'unknown'),5,3600))return fail('Too many registrations. Try later.',429);
     const email=input.email.trim().toLowerCase();
     if(await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(email).first())return fail('Unable to register this email',409);
