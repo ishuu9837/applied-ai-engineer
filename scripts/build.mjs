@@ -6,7 +6,7 @@ const dist=path.join(root,'dist');
 const preview=process.argv.includes('--preview');
 fs.rmSync(dist,{recursive:true,force:true});
 fs.mkdirSync(dist,{recursive:true});
-for(const item of ['index.html','assets','src','content/live','public-config.json']){
+for(const item of ['index.html','assets','src','content/live']){
  const source=path.join(root,item),destination=path.join(dist,item);
  fs.cpSync(source,destination,{recursive:true});
 }
