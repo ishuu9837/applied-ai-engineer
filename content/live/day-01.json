@@ -1,0 +1,263 @@
+{
+  "agenda": [
+    {
+      "time": "0:00–1:00",
+      "label": "LEARN",
+      "detail": "Concepts, a simple explanation, a deeper explanation, and the architecture sketch."
+    },
+    {
+      "time": "1:00–4:30",
+      "label": "BUILD",
+      "detail": "Write the core logic yourself, using the four-level hint ladder."
+    },
+    {
+      "time": "4:30–5:00",
+      "label": "BREAK IT",
+      "detail": "Deliberately reproduce one failure and document the fix."
+    },
+    {
+      "time": "5:00–5:30",
+      "label": "REVIEW",
+      "detail": "Five-question quiz, cheat sheet, and three interview questions."
+    },
+    {
+      "time": "5:30–6:00",
+      "label": "SHIP",
+      "detail": "Commit changes, add evidence to the README, draft one honest resume bullet."
+    }
+  ],
+  "day": 1,
+  "title": "Diagnostic & project hygiene",
+  "tagline": "Measure the gaps. Then fix only the ones that matter.",
+  "outcome": "A scored baseline diagnostic, a clean local Python project, and a tested first commit.",
+  "tier": {
+    "name": "Local laptop + GitHub + Databricks Free Edition",
+    "status": "Free for this lab. Databricks signup only today; no compute is needed. Public GitHub repos are available on the free plan. Check account-specific eligibility.",
+    "url": "https://docs.databricks.com/aws/en/getting-started/free-edition-limitations"
+  },
+  "concepts": [
+    {
+      "title": "From notebook to product",
+      "body": "Exploratory notebooks are excellent for research. A delivered AI application additionally needs repeatable installs, tests, configuration, safe inputs, and predictable failures.",
+      "deep": "A notebook proves that an idea can be explored; a product must make the same decision correctly when a new person calls it tomorrow. Move transformation logic into small importable functions. Express assumptions as types and validation, then use tests to specify edge cases. Keep credentials outside Git and environments reproducible.\n\nFor this sprint a 'shipped' feature requires a documented input/output contract, a test that can fail, a repeatable command, a named limitation and evidence of what ran. Docker and cloud hosting do not automatically satisfy those requirements. An API without stable error behavior is still an experiment.",
+      "mentalModel": "Exploration → deterministic function → tests → API → deployment.",
+      "exercise": "Take a notebook cell you use often. Write its function signature, one invalid input and one test that should fail when the logic is broken.",
+      "pitfall": "Do not hide invalid data with try/except: pass; observable failure is part of reliability."
+    },
+    {
+      "title": "Your two-hour diagnostic",
+      "body": "Set a two-hour timer during BUILD. Work independently: Python (30 min), SQL (30 min), Pandas (30 min), ML reasoning (30 min). Write down where you were slow. Do not ask AI for the answer before attempting.",
+      "deep": "The diagnostic is not a speed contest. Python: parse dirty inputs and test error cases. SQL: aggregate and preserve customers who have no orders. Pandas: group and clean without a row-wise loop. ML: explain leakage and choose a metric for a business cost. Each exercise is exactly 30 minutes; stop when its timebox ends.\n\nMark an answer as independent only if you wrote it before hints. Record the first failure, the fix and the new test. The goal is to identify gaps: being strong in PyTorch does not mean you can reliably join data or design an HTTP contract.",
+      "mentalModel": "Four probes × 30 minutes = one evidence-based gap list.",
+      "exercise": "Before coding, write what the output should be for a one-row and an empty input.",
+      "pitfall": "An LLM-generated answer is not your diagnostic score."
+    },
+    {
+      "title": "Quality gate",
+      "body": "Typing, linting, tests and environment variables are not ceremony. They let a colleague change your code without guessing what it does, and keep secrets out of Git.",
+      "deep": "A quality gate makes a broken change visible before users see it. `pytest` checks behavioral expectations. `ruff check` detects lint and common issues. Type hints communicate expectations but do not validate runtime values; `mypy` can be introduced later when useful. A `.gitignore` excludes untracked files, but cannot revoke leaked secrets or remove secrets already committed.\n\nSet up a small `src/` layout and test just one function today. Keep `README` commands copyable. Do not introduce ten tools because a real project should minimize dependencies and make failures understandable.",
+      "mentalModel": "Write → run tests → lint → inspect Git diff → commit.",
+      "exercise": "Name a specific failure each quality check would catch.",
+      "pitfall": "Never commit `.env`, personal data or notebook outputs containing credentials."
+    }
+  ],
+  "diagram": [
+    "Raw input",
+    "Pure Python function",
+    "Tests + lint",
+    "Git commit"
+  ],
+  "tasks": [
+    {
+      "id": "d1a",
+      "title": "Python diagnostic • 30 min",
+      "minutes": 30,
+      "brief": "Given a list of strings, nulls, and corrupt entries, implement a function returning the sum of valid non-negative integers and the number of invalid values. Decide whether negatives are invalid; document your choice.",
+      "deliverable": "A Python function plus 4 edge-case tests.",
+      "hints": [
+        "Make parsing and validation separate decisions. Ask what each invalid case should do.",
+        "Try iterating once, calling int() only inside try/except, and counting invalid items.",
+        "Pseudocode: initialize total and invalid; for each item: try parse; if not parseable or negative count invalid; else add; return pair."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "def summarize(values):\n    total, bad = 0, 0\n    for value in values:\n        try:\n            if isinstance(value, bool):\n                raise ValueError('booleans are not numbers')\n            number = int(value)\n            if number < 0:\n                raise ValueError('negative number')\n            total += number\n        except (ValueError, TypeError):\n            bad += 1\n    return total, bad\n\nassert summarize([]) == (0, 0)\nassert summarize([True, -1, 'oops', None]) == (0, 4)\nprint(summarize(['10', 'oops', '20', None, '30']))\n",
+        "run": "python diagnostic.py",
+        "expected": "(60, 2)"
+      },
+      "checks": [
+        "Empty list",
+        "Negative input",
+        "None input",
+        "Malformed string"
+      ]
+    },
+    {
+      "id": "d1b",
+      "title": "SQL diagnostic • 30 min",
+      "minutes": 30,
+      "brief": "Use SQLite or your SQL editor. Create a tiny orders table and answer: revenue by customer, customers with zero orders, and the most recent order per customer. You may use JOINs or a window function.",
+      "deliverable": "Save the SQL file and the output of each query.",
+      "hints": [
+        "There are separate questions about aggregation, missing matches, and latest rows.",
+        "GROUP BY handles revenue; LEFT JOIN exposes missing matches; ROW_NUMBER can rank orders.",
+        "Pseudocode: group orders by customer for revenue; left join customers to orders for zero orders; rank per customer by date then order id."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "import sqlite3\n\ncon = sqlite3.connect(':memory:')\ncon.executescript('''\nCREATE TABLE customers(id TEXT PRIMARY KEY);\nCREATE TABLE orders(id INTEGER PRIMARY KEY, customer_id TEXT, amount INTEGER);\nINSERT INTO customers VALUES ('A'), ('B'), ('C');\nINSERT INTO orders VALUES (1,'A',50),(2,'A',70),(3,'B',20);\n''')\nrevenue = con.execute('''\nSELECT c.id, COALESCE(SUM(o.amount),0) AS revenue\nFROM customers c LEFT JOIN orders o ON c.id=o.customer_id\nGROUP BY c.id ORDER BY c.id\n''').fetchall()\nlatest = con.execute('''\nWITH ranked AS (\n SELECT customer_id, id, ROW_NUMBER() OVER (\n PARTITION BY customer_id ORDER BY id DESC) rn FROM orders\n)\nSELECT customer_id, id FROM ranked WHERE rn=1 ORDER BY customer_id\n''').fetchall()\nprint(revenue)\nprint(latest)\n",
+        "run": "python sql_diagnostic.py",
+        "expected": "[('A', 120), ('B', 20), ('C', 0)] then [('A', 2), ('B', 3)]"
+      },
+      "checks": [
+        "Include a customer with zero orders",
+        "Handle tied dates deterministically"
+      ]
+    },
+    {
+      "id": "d1c",
+      "title": "Pandas diagnostic • 30 min",
+      "minutes": 30,
+      "brief": "Create a 10-row table with missing values and duplicates. Clean it without a row-wise Python loop. Compute a grouped summary. Explain what you did with missing data.",
+      "deliverable": "A short notebook or Python file with before/after row counts.",
+      "hints": [
+        "Pandas columns are whole arrays, not just lists of records.",
+        "Look at drop_duplicates, fillna, groupby, and how filtering treats missing values.",
+        "Pseudocode: inspect null counts; remove duplicates by business key; handle missing columns with a stated rule; aggregate by category."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "import pandas as pd\nrows = [('A',20),('A',20),('A',None),('B',5),('B',3),\n        ('B',None),('C',9),('C',1),('C',7),('D',4)]\ndf = pd.DataFrame(rows, columns=['customer','amount'])\nclean = df.drop_duplicates().dropna(subset=['amount']).copy()\nclean['amount'] = pd.to_numeric(clean['amount'])\nprint(clean.groupby('customer')['amount'].sum().to_dict())\nprint(f'raw={len(df)}, clean={len(clean)}')\n",
+        "run": "python -m pip install pandas && python pandas_diagnostic.py",
+        "expected": "{'A': 20.0, 'B': 8.0, 'C': 17.0, 'D': 4.0}; raw=10, clean=7"
+      },
+      "checks": [
+        "Explain duplicate key choice",
+        "Report null count before cleaning"
+      ]
+    },
+    {
+      "id": "d1d",
+      "title": "ML reasoning diagnostic • 30 min",
+      "minutes": 30,
+      "brief": "Explain in your own words: leakage, a suitable classification baseline, precision vs recall for missed payment prediction, and why an accuracy-only report can deceive.",
+      "deliverable": "Four short answers, each with a failure example.",
+      "hints": [
+        "Think about what is known at prediction time.",
+        "A feature collected after the label outcome may leak the answer.",
+        "Pseudocode: define timestamp of prediction; list known features; remove future-only features; choose baseline; evaluate beyond one metric."
+      ],
+      "reference": {
+        "language": "python",
+        "code": "# A highly imbalanced example: 95 paid on time, 5 late.\n# A classifier that always says \"on time\" gets 95% accuracy\n# yet catches ZERO late payments.\nactual = [0] * 95 + [1] * 5\npred = [0] * 100\ncorrect = sum(a == p for a, p in zip(actual, pred))\nlate_recall = sum(a == 1 and p == 1 for a, p in zip(actual, pred)) / sum(actual)\nprint(f'accuracy={correct/len(actual):.0%}, late_recall={late_recall:.0%}')\n",
+        "run": "python ml_diagnostic.py",
+        "expected": "accuracy=95%, late_recall=0%"
+      },
+      "checks": []
+    },
+    {
+      "id": "d1e",
+      "title": "Build the project skeleton • 90 min",
+      "minutes": 90,
+      "brief": "Create .venv, pyproject.toml, src/, tests/, .gitignore and README. Install pytest and ruff. Implement one function from the diagnostic with a test. Run pytest and ruff locally. Use venv + pip today; uv is optional, not required.",
+      "deliverable": "A tested, linted repository with no secrets, datasets, or virtual environment checked in.",
+      "hints": [
+        "Keep production code separate from tests, and never store tokens in Git.",
+        "Use python -m venv .venv, pip install pytest ruff, and run python -m pytest followed by ruff check .",
+        "Pseudocode: create folders; make environment; add dependencies; write function; write test; run checks; commit only source/config/documentation."
+      ],
+      "reference": {
+        "language": "bash",
+        "code": "mkdir -p src/aae tests\npython -m venv .venv\n# macOS / Linux (Windows PowerShell uses .venv\\Scripts\\Activate.ps1)\nsource .venv/bin/activate\npython -m pip install pytest ruff\nprintf 'def add(a: int, b: int) -> int:\\n    return a + b\\n' > src/aae/__init__.py\nprintf 'from aae import add\\ndef test_add():\\n    assert add(2, 3) == 5\\n' > tests/test_add.py\nprintf '[tool.pytest.ini_options]\\npythonpath = [\"src\"]\\n' > pyproject.toml\nprintf '.venv/\\n.env\\n__pycache__/\\n.pytest_cache/\\n' > .gitignore\npython -m pytest -q\nruff check src tests\n",
+        "run": "Save as setup.sh, then bash setup.sh in an empty folder with Python installed",
+        "expected": "1 passed; All checks passed! (versions and timings vary)"
+      },
+      "checks": [
+        "At least 1 passing test",
+        "Ruff reports no errors",
+        "README has reproducible commands",
+        "Databricks signup attempted"
+      ]
+    }
+  ],
+  "break": {
+    "title": "Deliberately commit a secret — safely simulate, never use a real key",
+    "challenge": "Create a dummy string called EXAMPLE_TOKEN and verify whether .gitignore excludes .env but NOT committed Python source. Remove the dummy string and write a rule: secrets belong in environment variables and a secret manager, never in source.",
+    "diagnose": "git status and git diff --cached reveal exactly what would be committed; .gitignore does not erase tracked files."
+  },
+  "quiz": [
+    {
+      "question": "Which file normally should NOT go to a public repository?",
+      "choices": [
+        "README.md",
+        ".env with real API key",
+        "pyproject.toml",
+        "tests/test_app.py"
+      ],
+      "answer": 1,
+      "explanation": ".env commonly contains secrets. Commit an .env.example with placeholder names instead."
+    },
+    {
+      "question": "What does pytest primarily provide?",
+      "choices": [
+        "Model training",
+        "Automated checks of expected behavior",
+        "Version control",
+        "Cloud compute"
+      ],
+      "answer": 1,
+      "explanation": "pytest runs repeatable tests; it does not train models."
+    },
+    {
+      "question": "A feature measured after the target event is often…",
+      "choices": [
+        "A useful baseline",
+        "Data leakage",
+        "Required for calibration",
+        "A primary key"
+      ],
+      "answer": 1,
+      "explanation": "Post-outcome features can make test metrics falsely optimistic."
+    },
+    {
+      "question": "Why use a virtual environment?",
+      "choices": [
+        "Guarantee faster Python",
+        "Keep dependencies isolated",
+        "Encrypt project data",
+        "Replace Docker"
+      ],
+      "answer": 1,
+      "explanation": "Separate environments help reproduce installs and avoid conflicts."
+    },
+    {
+      "question": "What does ruff check do?",
+      "choices": [
+        "Static linting",
+        "Start a web server",
+        "Execute SQL",
+        "Deploy an API"
+      ],
+      "answer": 0,
+      "explanation": "Ruff is a fast Python linter and formatter; linting is not a substitute for tests."
+    }
+  ],
+  "cheatsheet": [
+    "Pure function = same input, same result, no outside side effects.",
+    "Use type hints for contracts; validate untrusted inputs at runtime.",
+    "Never commit .env, credentials, private data, or large model weights.",
+    "Leakage: data from the future or data derived from the label.",
+    "pytest validates behavior; ruff catches many static quality issues.",
+    "A reproducible README has install, run, test, assumptions and limitations."
+  ],
+  "interview": [
+    "Tell me about your last ML project. How would you make it reproducible for another engineer?",
+    "How do you catch leakage before training rather than after a suspiciously high score?",
+    "What do you unit-test in an ML data-cleaning function, and what requires integration tests?"
+  ],
+  "ship": [
+    "Git commit: day01: diagnostic and project scaffold",
+    "README: show commands, test result and actual gaps",
+    "Draft bullet: Built a reproducible Python project with X passing tests and lint checks (replace X after running)."
+  ]
+}
