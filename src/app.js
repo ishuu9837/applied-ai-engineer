@@ -18,7 +18,6 @@ let lessons=new Map();
 let selectedTab='learn';
 let focusSeconds=25*60,focusRunning=false;
 let activeAgendaIndex=0;
-let cloudApiBase='/api';
 const day0 = [
  {id:'databricks',name:'Create Databricks Free Edition account',url:'https://www.databricks.com/learn/free-edition'},
  {id:'github',name:'Confirm GitHub public repository is ready',url:'https://github.com/ishuu9837'},
