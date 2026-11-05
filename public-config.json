@@ -1,5 +1,0 @@
-{
-  "apiBase": "/api",
-  "mode": "same-origin-accounts",
-  "notes": "Do not store secrets or tokens in public frontend config."
-}
