@@ -31,7 +31,7 @@ function persist(){
 }
 const has=(list,item)=>Array.isArray(list)&&list.includes(item);
 const toggle=(list,item)=>has(list,item)?list.filter(x=>x!==item):[...list,item];
-function currentRoute(){let raw;try{raw=decodeURIComponent(location.hash.replace(/^#\/?/,'').trim());}catch{return 'home';}if(!raw||raw==='login'||raw==='signup')return 'home';return raw;}
+function currentRoute(){let raw;try{raw=decodeURIComponent(location.hash.replace(/^#\/?/,'').trim());}catch{return 'home';}if(!raw||raw==='login'||raw==='signup')return 'landing';return raw;}
 const navigate=(route)=>{location.hash=`/${route}`;window.scrollTo({top:0,behavior:'smooth'});};
 function openDay(day){if(!isAvailable(day,catalog.releasedDays))return; selectedTab='learn';navigate(`day/${day}`);}
 function stageKey(day,tab){return `${day}:${tab}`;}
@@ -73,7 +73,7 @@ function renderProgress(){const daysCompleted=[...progress.done].sort((a,b)=>a-b
 function renderSettings(){return `<div class="eyebrow">PREFERENCES + PRIVACY</div><h1 class="page-title">Local-first by design.</h1><div class="read-grid" style="margin-top:25px"><div class="card"><h3>Local progress</h3><p>No account or login is required. Your missions, quizzes, XP and notes are saved in this browser. Progress is not synced between devices.</p><div class="action-row"><button class="btn btn-small" data-action="export-progress">Export JSON backup</button><button class="btn btn-small btn-danger" data-action="reset-progress">Reset progress…</button></div></div><div class="card"><h3>Privacy</h3><p>Learning progress stays on your device. Export a backup before clearing browser data or changing devices. No private cloud storage or user accounts are used.</p></div><div class="card"><h3>Publishing</h3><p>Three-day batches are prepared and validated before release. Missing lessons are not auto-generated.</p><p>Last recorded release: ${escapeHTML(catalog.lastReleaseDate||'Not yet published')}.</p></div><div class="card"><h3>Coaching contract</h3><p>Ask “Start Day 1” in ChatGPT to begin the interactive six-hour session. The website is your interactive game companion.</p></div></div>`;}
 
 function formatSeconds(seconds){const m=Math.floor(seconds/60),s=seconds%60;return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}
-function render(){const route=currentRoute();let page;if(route.startsWith('day/')){const n=Number(route.split('/')[1]);page=n>=1&&n<=20?renderLesson(n):renderCurriculum();}else if(route==='curriculum')page=renderCurriculum();else if(route==='projects')page=renderProjects();else if(route==='progress')page=renderProgress();else if(route==='settings')page=renderSettings();else page=renderHome();$('#app').innerHTML=shell(page);}
+function render(){const route=currentRoute();const isLanding=route==='landing';document.body.classList.toggle('landing-mode',isLanding);if(isLanding){$('#app').innerHTML='';return;}let page;if(route.startsWith('day/')){const n=Number(route.split('/')[1]);page=n>=1&&n<=20?renderLesson(n):renderCurriculum();}else if(route==='curriculum')page=renderCurriculum();else if(route==='projects')page=renderProjects();else if(route==='progress')page=renderProgress();else if(route==='settings')page=renderSettings();else page=renderHome();$('#app').innerHTML=shell(page);}
 
 async function reloadLessons(){try{
  const response=await fetch('./content/live/catalog.json',{cache:'no-store'});
